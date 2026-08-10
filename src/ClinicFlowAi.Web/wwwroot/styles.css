@@ -1,0 +1,4 @@
+body { font-family: sans-serif; margin: 2rem; }
+main { max-width: 40rem; }
+label { display: block; margin: 1rem 0; }
+input, button { padding: 0.5rem; }
