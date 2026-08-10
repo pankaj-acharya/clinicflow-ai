@@ -49,3 +49,7 @@ app.MapPost("/bookings", (BookingRequestDto request) =>
 });
 
 app.Run();
+
+public partial class Program
+{
+}

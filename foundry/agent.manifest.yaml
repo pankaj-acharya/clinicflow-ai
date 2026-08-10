@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/microsoft/AgentSchema/refs/heads/main/schemas/v1.0/AgentManifest.yaml
+
+name: clinicflow-booking-assistant
+displayName: ClinicFlow Booking Assistant
+description: >
+  Hosted Microsoft Foundry agent package for ClinicFlow appointment support.
+  The manifest is published from CI so it can be promoted into a real Foundry
+  deployment later without reshaping the repo layout.
+template:
+  kind: hosted
+  protocols:
+    - protocol: responses
+      version: 1.0.0
+parameters:
+  properties:
+    - name: model_deployment_name
+      secret: false
+      description: Foundry model deployment name used by the hosted agent.
+    - name: clinicflow_api_base_url
+      secret: false
+      description: Base URL for the ClinicFlow API.
+    - name: clinicflow_gateway_base_url
+      secret: false
+      description: Base URL for the ClinicFlow agent gateway.
+    - name: agent_instructions
+      secret: false
+      description: System instructions for the booking assistant.

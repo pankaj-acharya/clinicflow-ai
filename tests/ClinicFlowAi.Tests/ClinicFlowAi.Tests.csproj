@@ -10,9 +10,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClinicFlowAi.Domain\ClinicFlowAi.Domain.csproj" />
     <ProjectReference Include="..\..\src\ClinicFlowAi.Integrations\ClinicFlowAi.Integrations.csproj" />
+    <ProjectReference Include="..\..\src\ClinicFlowAi.Api\ClinicFlowAi.Api.csproj" Aliases="ApiHost" />
+    <ProjectReference Include="..\..\src\ClinicFlowAi.Web\ClinicFlowAi.Web.csproj" Aliases="WebHost" />
+    <ProjectReference Include="..\..\src\ClinicFlowAi.AgentGateway\ClinicFlowAi.AgentGateway.csproj" Aliases="GatewayHost" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageReference Include="MSTest.TestFramework" Version="3.6.4" />
     <PackageReference Include="MSTest.TestAdapter" Version="3.6.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
