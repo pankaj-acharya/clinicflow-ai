@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClinicFlowAi.Domain\ClinicFlowAi.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ClinicFlowAi.Integrations\ClinicFlowAi.Integrations.csproj" />
   </ItemGroup>
 
   <ItemGroup>
