@@ -42,5 +42,31 @@ public sealed class BookingEngine
     }
 
     public static bool CanHoldSlot(DateTimeOffset nowUtc, DateTimeOffset holdExpiresAtUtc) => nowUtc < holdExpiresAtUtc;
-}
 
+    public static SlotHold CreateHold(
+        string holdId,
+        string clinicId,
+        string clinicianId,
+        DateTimeOffset startsAtUtc,
+        TimeSpan holdDuration,
+        DateTimeOffset nowUtc)
+    {
+        var expiresAtUtc = nowUtc.Add(holdDuration);
+        if (!CanHoldSlot(nowUtc, expiresAtUtc))
+        {
+            throw new InvalidOperationException("Hold expiration must be in the future.");
+        }
+
+        return new SlotHold(holdId, clinicId, clinicianId, startsAtUtc, expiresAtUtc);
+    }
+
+    public static BookingResult ConfirmBooking(BookingRequest request, string appointmentId, bool alreadyConfirmed)
+    {
+        if (request.EndsAtUtc <= request.StartsAtUtc)
+        {
+            throw new InvalidOperationException("Appointment end time must be after the start time.");
+        }
+
+        return new BookingResult(appointmentId, alreadyConfirmed ? AppointmentState.Confirmed : AppointmentState.Confirmed);
+    }
+}

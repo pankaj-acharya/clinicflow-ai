@@ -34,7 +34,15 @@ public sealed record Appointment(
     DateTimeOffset EndsAtUtc,
     AppointmentState State);
 
+public sealed record BookingRequest(
+    string ClinicId,
+    string ClinicianId,
+    string PatientReferenceId,
+    DateTimeOffset StartsAtUtc,
+    DateTimeOffset EndsAtUtc);
+
+public sealed record BookingResult(string AppointmentId, AppointmentState State);
+
 public sealed record AuditEvent(string Id, string Actor, string Action, DateTimeOffset OccurredAtUtc);
 
 public sealed record AvailabilitySlot(DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
-

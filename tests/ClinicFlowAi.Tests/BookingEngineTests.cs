@@ -49,4 +49,33 @@ public sealed class BookingEngineTests
 
         Assert.AreEqual(2, slots.Count);
     }
+
+    [TestMethod]
+    public void CreateHold_sets_future_expiry()
+    {
+        var hold = BookingEngine.CreateHold(
+            "hold-1",
+            "clinic-1",
+            "clinician-1",
+            new DateTimeOffset(2026, 8, 11, 9, 0, 0, TimeSpan.Zero),
+            TimeSpan.FromMinutes(10),
+            new DateTimeOffset(2026, 8, 11, 8, 0, 0, TimeSpan.Zero));
+
+        Assert.AreEqual(new DateTimeOffset(2026, 8, 11, 8, 10, 0, TimeSpan.Zero), hold.ExpiresAtUtc);
+    }
+
+    [TestMethod]
+    public void ConfirmBooking_rejects_invalid_time_range()
+    {
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            BookingEngine.ConfirmBooking(
+                new BookingRequest(
+                    "clinic-1",
+                    "clinician-1",
+                    "patient-1",
+                    new DateTimeOffset(2026, 8, 11, 10, 0, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 8, 11, 9, 0, 0, TimeSpan.Zero)),
+                "appt-1",
+                false));
+    }
 }
