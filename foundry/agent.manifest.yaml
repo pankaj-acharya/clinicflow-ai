@@ -8,20 +8,29 @@ description: >
   deployment later without reshaping the repo layout.
 template:
   kind: hosted
+  name: clinicflow-booking-assistant
   protocols:
     - protocol: responses
       version: 1.0.0
 parameters:
   properties:
     - name: model_deployment_name
+      kind: string
       secret: false
       description: Foundry model deployment name used by the hosted agent.
     - name: clinicflow_api_base_url
+      kind: string
       secret: false
       description: Base URL for the ClinicFlow API.
     - name: clinicflow_gateway_base_url
+      kind: string
       secret: false
       description: Base URL for the ClinicFlow agent gateway.
     - name: agent_instructions
+      kind: string
       secret: false
       description: System instructions for the booking assistant.
+
+resources:
+  - name: model_deployment_name
+    kind: model
