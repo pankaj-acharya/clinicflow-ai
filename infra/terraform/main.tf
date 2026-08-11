@@ -26,7 +26,7 @@ resource "azurerm_resource_provider_registration" "required" {
     "Microsoft.App",
     "Microsoft.CognitiveServices",
     "Microsoft.ContainerRegistry",
-    "Microsoft.Insights",
+    "microsoft.insights",
     "Microsoft.KeyVault",
     "Microsoft.ManagedIdentity",
     "Microsoft.OperationalInsights",
