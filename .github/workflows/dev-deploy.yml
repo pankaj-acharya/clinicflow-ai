@@ -100,6 +100,11 @@ jobs:
         run: |
           terraform output -json > ../../terraform-outputs.json
 
+      - name: Login to Azure Container Registry
+        shell: bash
+        run: |
+          az acr login --name "$TF_VAR_container_registry_name"
+
       - name: Build and push API image
         shell: bash
         run: |
