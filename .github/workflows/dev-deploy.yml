@@ -2,6 +2,17 @@ name: dev-deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      destroy_resources:
+        description: 'Delete all cloud resources to avoid unwanted costs'
+        required: false
+        default: false
+        type: boolean
+      destroy_foundry_agents:
+        description: 'Delete only Foundry agents and model versions (preserves Foundry project)'
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -29,6 +40,8 @@ env:
 
 jobs:
   deploy-infrastructure-and-apps:
+    # Skip deployment if any destruction is requested
+    if: ${{ github.event_name == 'push' || (!inputs.destroy_resources && !inputs.destroy_foundry_agents) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -116,6 +129,8 @@ jobs:
         run: terraform output
 
   deploy-foundry-agent:
+    # Skip Foundry deployment if any destruction is requested
+    if: ${{ github.event_name == 'push' || (!inputs.destroy_resources && !inputs.destroy_foundry_agents) }}
     runs-on: ubuntu-latest
     needs: deploy-infrastructure-and-apps
     permissions:
@@ -167,3 +182,102 @@ jobs:
         with:
           name: foundry-agent-deployment
           path: foundry/foundry-deployment-result.json
+
+  cleanup-foundry-agents:
+    # Only run if Foundry agent destruction is explicitly requested via workflow_dispatch
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.destroy_foundry_agents }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Foundry dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install azure-identity azure-ai-projects pyyaml
+
+      - name: Delete Foundry agents and models
+        shell: bash
+        env:
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          FOUNDRY_AGENT_NAME: clinicflow-booking-assistant
+        run: |
+          python foundry/scripts/cleanup_foundry_agents.py
+
+      - name: Foundry cleanup summary
+        shell: bash
+        run: |
+          echo "✅ Foundry cleanup complete"
+          echo "All agent versions for 'clinicflow-booking-assistant' have been removed."
+          echo "Note: Foundry project, AI resources, and model deployments were preserved."
+
+  cleanup-resources:
+    # Only run if destruction is explicitly requested via workflow_dispatch
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.destroy_resources }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init for cleanup
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${TF_STATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${TF_STATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${TF_STATE_CONTAINER}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="use_azuread_auth=true"
+        env:
+          TF_IN_AUTOMATION: true
+          TF_INPUT: false
+          TF_VAR_environment: dev
+          TF_VAR_region: uksouth
+          TF_VAR_container_registry_name: clinicflowaidev
+
+      - name: Terraform destroy
+        working-directory: infra/terraform
+        run: |
+          terraform destroy -auto-approve
+        env:
+          TF_IN_AUTOMATION: true
+          TF_INPUT: false
+          TF_VAR_environment: dev
+          TF_VAR_region: uksouth
+          TF_VAR_container_registry_name: clinicflowaidev
+
+      - name: Cleanup summary
+        shell: bash
+        run: |
+          echo "✅ Resource cleanup complete"
+          echo "All Azure resources defined in terraform have been destroyed."
+          echo "Note: Terraform state backend storage account ($TF_STATE_STORAGE_ACCOUNT) was preserved to maintain state for future deployments."

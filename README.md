@@ -49,6 +49,20 @@ The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github
 4. Applies the application layer with those image tags.
 5. Deploys a prompt agent version into your Foundry project using the assets under [foundry/](foundry/).
 
+### Cleanup Options
+
+The workflow supports optional resource cleanup to reduce Azure costs:
+
+- **Destroy All Resources** (`destroy_resources` checkbox): Runs `terraform destroy` to remove all provisioned infrastructure (Container Apps, ACR, App Insights, Key Vault, etc.). The Terraform state backend storage account is preserved for future deployments.
+- **Destroy Foundry Agents Only** (`destroy_foundry_agents` checkbox): Removes only agent versions from your Foundry project. The Foundry project, AI Services, and model deployments are preserved.
+
+To use cleanup:
+
+1. Go to **Actions** → **dev-deploy** in GitHub
+2. Click **Run workflow**
+3. Check the desired cleanup option(s) and run
+4. Only the cleanup job(s) will execute (deployment is skipped)
+
 ## Fixed Local Ports
 
 The runnable hosts use fixed localhost ports through `launchSettings.json`:
