@@ -291,6 +291,10 @@ jobs:
           TF_VAR_container_registry_name: clinicflowaidev
 
       - name: Terraform destroy
+        # Note: provider unregistration (e.g. Microsoft.App) is intentionally
+        # skipped via resource_provider_registrations = "none" in providers.tf.
+        # Azure provider registration is subscription-level and must not be
+        # unregistered here while other resources may still exist.
         working-directory: infra/terraform
         run: |
           terraform destroy -auto-approve
