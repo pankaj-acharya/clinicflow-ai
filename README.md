@@ -43,11 +43,30 @@ The dev deployment target is Azure Container Apps with supporting infrastructure
 
 The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github/workflows/dev-deploy.yml). It:
 
-1. Boots Terraform state storage.
-2. Applies base infrastructure.
-3. Builds and pushes API and gateway images.
-4. Applies the application layer with those image tags.
-5. Deploys a prompt agent version into your Foundry project using the assets under [foundry/](foundry/).
+1. Validates bootstrap prerequisites, registers required Azure resource providers, and surfaces the deployment identity and target scopes.
+2. Boots Terraform state storage.
+3. Applies base infrastructure, including ACR role assignments for the deployment identity and runtime managed identity.
+4. Verifies the ACR role assignments before any image build or push work starts.
+5. Builds and pushes API and gateway images.
+6. Applies the application layer with those image tags.
+7. Validates Foundry prerequisites and deploys a prompt agent version into your Foundry project using the assets under [foundry/](foundry/).
+
+### Azure bootstrap boundary
+
+The pipeline now manages the repeatable, in-scope prerequisites that it can create itself:
+
+- Azure resource provider registration for `Microsoft.App`, `Microsoft.CognitiveServices`, `Microsoft.ContainerRegistry`, `Microsoft.Insights`, `Microsoft.KeyVault`, `Microsoft.ManagedIdentity`, `Microsoft.OperationalInsights`, and `Microsoft.Storage`
+- `AcrPush` on the created ACR for the GitHub Actions deployment identity
+- `User Access Administrator` on the created ACR for the GitHub Actions deployment identity
+- `AcrPull` on the created ACR for the user-assigned managed identity used by Container Apps
+
+The following bootstrap permissions must still exist before the first run:
+
+- the deployment identity can create Azure resources in the target subscription or resource group
+- the deployment identity can create Azure role assignments for newly created ACR resources, typically through `Owner`, `User Access Administrator`, or `Role Based Access Control Administrator` at a parent scope
+- the deployment identity already has write-capable Foundry / Azure AI access at the target project or parent resource scope, such as `Contributor` or an equivalent tenant-specific Foundry role
+
+If one of those bootstrap permissions is missing, the workflow fails in a preflight stage with remediation guidance before container image build and deployment steps begin.
 
 ### Cleanup Options
 
