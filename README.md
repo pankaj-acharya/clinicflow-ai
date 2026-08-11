@@ -55,7 +55,7 @@ The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github
 
 The pipeline now manages the repeatable, in-scope prerequisites that it can create itself:
 
-- Azure resource provider registration for `Microsoft.App`, `Microsoft.CognitiveServices`, `Microsoft.ContainerRegistry`, `Microsoft.Insights`, `Microsoft.KeyVault`, `Microsoft.ManagedIdentity`, `Microsoft.OperationalInsights`, and `Microsoft.Storage`
+- Azure resource provider registration for `Microsoft.App`, `Microsoft.CognitiveServices`, `Microsoft.ContainerRegistry`, `microsoft.insights`, `Microsoft.KeyVault`, `Microsoft.ManagedIdentity`, `Microsoft.OperationalInsights`, and `Microsoft.Storage`
 - `AcrPush` on the created ACR for the GitHub Actions deployment identity
 - `User Access Administrator` on the created ACR for the GitHub Actions deployment identity
 - `AcrPull` on the created ACR for the user-assigned managed identity used by Container Apps

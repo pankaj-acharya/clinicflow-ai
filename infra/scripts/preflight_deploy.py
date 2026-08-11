@@ -11,7 +11,7 @@ REQUIRED_PROVIDERS = [
     "Microsoft.App",
     "Microsoft.CognitiveServices",
     "Microsoft.ContainerRegistry",
-    "Microsoft.Insights",
+    "microsoft.insights",
     "Microsoft.KeyVault",
     "Microsoft.ManagedIdentity",
     "Microsoft.OperationalInsights",
