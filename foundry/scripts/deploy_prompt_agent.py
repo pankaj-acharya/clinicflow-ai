@@ -36,6 +36,14 @@ def _build_instructions() -> str:
     return "\n".join(lines)
 
 
+def _deployment_identity_hint() -> str:
+    client_id = os.getenv("AZURE_CLIENT_ID", "").strip()
+    if client_id:
+        return f"Azure client ID {client_id}"
+
+    return "the current Azure deployment identity"
+
+
 def main() -> None:
     project_endpoint = _require_env("FOUNDRY_PROJECT_ENDPOINT")
     model_deployment_name = _require_env("FOUNDRY_MODEL_DEPLOYMENT_NAME")
@@ -49,11 +57,18 @@ def main() -> None:
     )
 
     credential = DefaultAzureCredential()
-    with AIProjectClient(endpoint=project_endpoint, credential=credential) as project_client:
-        agent_version = project_client.agents.create_version(
-            agent_name=agent_name,
-            definition=definition,
-        )
+    try:
+        with AIProjectClient(endpoint=project_endpoint, credential=credential) as project_client:
+            agent_version = project_client.agents.create_version(
+                agent_name=agent_name,
+                definition=definition,
+            )
+    except Exception as exc:
+        raise RuntimeError(
+            "Foundry deployment failed. "
+            f"Ensure {_deployment_identity_hint()} has write-capable access to {project_endpoint} "
+            "such as Contributor or a tenant-specific Foundry author role before rerunning the workflow."
+        ) from exc
 
     deployment_result = {
         "agent_name": agent_version.name,

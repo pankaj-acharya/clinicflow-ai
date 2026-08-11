@@ -9,6 +9,8 @@ Current contents:
 
 The CI pipeline validates this manifest and performs a real Foundry deployment by creating a new prompt-agent version.
 
+Before the first deployment run, the GitHub Actions deployment identity must already have write-capable access to the target Foundry / Azure AI project scope, such as `Contributor` or an equivalent tenant-specific Foundry author role. The workflow now validates the configured Foundry endpoint before deployment and fails with explicit remediation if that bootstrap permission is missing.
+
 Required GitHub repository secrets for the Foundry deploy stage:
 
 - `FOUNDRY_PROJECT_ENDPOINT`
