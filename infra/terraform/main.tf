@@ -23,7 +23,6 @@ resource "azurerm_resource_group" "this" {
 
 resource "azurerm_resource_provider_registration" "required" {
   for_each = toset([
-    "Microsoft.App",
     "Microsoft.CognitiveServices",
     "Microsoft.ContainerRegistry",
     "microsoft.insights",
