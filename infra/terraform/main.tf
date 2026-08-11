@@ -54,10 +54,12 @@ resource "azurerm_container_registry" "this" {
 resource "random_uuid" "acr_pull_role_assignment" {}
 
 resource "azurerm_role_assignment" "acr_pull" {
-  name                 = random_uuid.acr_pull_role_assignment.result
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = azurerm_user_assigned_identity.this.principal_id
+  name                             = random_uuid.acr_pull_role_assignment.result
+  scope                            = azurerm_container_registry.this.id
+  role_definition_name             = "AcrPull"
+  principal_id                     = azurerm_user_assigned_identity.this.principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_key_vault" "this" {
@@ -97,11 +99,17 @@ resource "azurerm_key_vault" "this" {
   }
 }
 
+resource "azurerm_resource_provider_registration" "microsoft_app" {
+  name = "Microsoft.App"
+}
+
 resource "azurerm_container_app_environment" "this" {
   name                       = local.container_apps_environment
   location                   = azurerm_resource_group.this.location
   resource_group_name        = azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  depends_on = [azurerm_resource_provider_registration.microsoft_app]
 }
 
 resource "azurerm_container_app" "api" {
