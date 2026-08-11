@@ -4,4 +4,7 @@ obj/
 TestResults/
 *.user
 *.suo
+.terraform/
+__pycache__/
+*.pyc
 

@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/.vs
+**/.terraform
+**/.terraform.lock.hcl
+**/.git
+**/.gitignore
+**/*.user
+**/*.suo
+tests/
+docs/
+infra/
+foundry/
