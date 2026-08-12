@@ -80,8 +80,32 @@ app.MapPost("/slot-holds", (SlotHoldRequest request) =>
     return Results.Ok(hold);
 });
 
-app.MapPost("/bookings", (BookingRequestDto request) =>
+app.MapPost("/bookings", async (BookingRequestDto request, IAppointmentRepository? repo) =>
 {
+    // If Postgres is wired, create booking with persistent slot marking
+    if (repo is not null)
+    {
+        try
+        {
+            var booking = await repo.CreateBookingAsync(
+                GenerateSlotId(request.ClinicianId, request.StartsAtUtc),
+                request.PatientReferenceId);
+            
+            return Results.Ok(new
+            {
+                booking.Id,
+                Status = booking.Status,
+                booking.Slot.StartsAtUtc,
+                booking.Slot.EndsAtUtc
+            });
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Postgres booking creation failed, falling back to stub");
+        }
+    }
+
+    // Fallback to in-memory stub
     var result = BookingEngine.ConfirmBooking(
         new BookingRequest(
             request.ClinicId,
@@ -184,6 +208,12 @@ app.MapPost("/ask", async (NlSchedulingRequest request, IHttpClientFactory httpC
 });
 
 app.Run();
+
+// Generate a deterministic slot ID from clinician ID and start time for lookup purposes
+static string GenerateSlotId(string clinicianId, DateTimeOffset startsAtUtc)
+{
+    return $"slot-{clinicianId}-{startsAtUtc:yyyyMMddHHmmss}".Replace(" ", "").ToLowerInvariant();
+}
 
 static IReadOnlyList<AvailableSlotOption> GenerateStubSlots(NlSchedulingRequest request, int count)
 {
