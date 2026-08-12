@@ -51,6 +51,52 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Grant service principal RBAC permissions
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+          PRINCIPAL_OBJECT_ID=$(az ad sp show --id "$AZURE_CLIENT_ID" --query id -o tsv)
+
+          echo "📋 Configuring RBAC for deployment principal"
+          echo "   Principal Object ID: $PRINCIPAL_OBJECT_ID"
+          echo "   Subscription: $SUBSCRIPTION_ID"
+
+          # Check and grant User Access Administrator (required for role assignments in Terraform)
+          if az role assignment list \
+               --assignee "$PRINCIPAL_OBJECT_ID" \
+               --scope "/subscriptions/$SUBSCRIPTION_ID" \
+               --query "[?roleDefinitionName=='User Access Administrator'].id" \
+               -o tsv | grep -q .; then
+            echo "✅ User Access Administrator role already assigned"
+          else
+            echo "⏳ Granting User Access Administrator role..."
+            az role assignment create \
+              --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+              --role "User Access Administrator" \
+              --scope "/subscriptions/$SUBSCRIPTION_ID" \
+              --assignee-principal-type ServicePrincipal
+            echo "✅ User Access Administrator role granted"
+          fi
+
+          # Check and grant Contributor (required for full resource creation)
+          if az role assignment list \
+               --assignee "$PRINCIPAL_OBJECT_ID" \
+               --scope "/subscriptions/$SUBSCRIPTION_ID" \
+               --query "[?roleDefinitionName=='Contributor'].id" \
+               -o tsv | grep -q .; then
+            echo "✅ Contributor role already assigned"
+          else
+            echo "⏳ Granting Contributor role..."
+            az role assignment create \
+              --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+              --role "Contributor" \
+              --scope "/subscriptions/$SUBSCRIPTION_ID" \
+              --assignee-principal-type ServicePrincipal
+            echo "✅ Contributor role granted"
+          fi
+
       - name: Preflight bootstrap prerequisites
         shell: bash
         env:
