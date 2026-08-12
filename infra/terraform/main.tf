@@ -209,6 +209,13 @@ import {
   to = azurerm_postgresql_flexible_server.this[0]
   id = "/subscriptions/3e430fb8-73f7-4930-a2ec-645fd80f5661/resourceGroups/clinicflow-ai-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/clinicflow-ai-dev-psql"
 }
+
+# Import the pre-existing firewall rule that was created manually.
+# Safe to keep permanently — Terraform skips if already in state.
+import {
+  to = azurerm_postgresql_flexible_server_firewall_rule.allow_azure_services[0]
+  id = "/subscriptions/3e430fb8-73f7-4930-a2ec-645fd80f5661/resourceGroups/clinicflow-ai-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/clinicflow-ai-dev-psql/firewallRules/allow-azure-services"
+}
 # ---------------------------------------------------------------------------
 # PostgreSQL Flexible Server
 # ---------------------------------------------------------------------------

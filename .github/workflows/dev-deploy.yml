@@ -95,7 +95,19 @@ jobs:
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
-            -var="deploy_container_apps=false" \
+            -target=azurerm_resource_group.this \
+            -target=azurerm_log_analytics_workspace.this \
+            -target=azurerm_application_insights.this \
+            -target=azurerm_user_assigned_identity.this \
+            -target=azurerm_container_registry.this \
+            -target=azurerm_role_assignment.acr_pull \
+            -target=azurerm_role_assignment.acr_push \
+            -target=azurerm_role_assignment.acr_user_access_administrator \
+            -target=azurerm_key_vault.this \
+            -target='azurerm_postgresql_flexible_server.this[0]' \
+            -target='azurerm_postgresql_flexible_server_database.this[0]' \
+            -target='azurerm_postgresql_flexible_server_firewall_rule.allow_azure_services[0]' \
+            -target=azurerm_container_app_environment.this \
             -var="deploy_postgres=true"
 
       - name: Capture Terraform outputs
