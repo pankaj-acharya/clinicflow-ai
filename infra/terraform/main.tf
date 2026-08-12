@@ -54,28 +54,19 @@ resource "azurerm_container_registry" "this" {
   admin_enabled       = false
 }
 
-resource "random_uuid" "acr_pull_role_assignment" {}
-
-resource "random_uuid" "acr_push_role_assignment" {}
-
-resource "random_uuid" "acr_user_access_administrator_role_assignment" {}
-
 resource "azurerm_role_assignment" "acr_push" {
-  name                 = random_uuid.acr_push_role_assignment.result
   scope                = azurerm_container_registry.this.id
   role_definition_name = "AcrPush"
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
 resource "azurerm_role_assignment" "acr_user_access_administrator" {
-  name                 = random_uuid.acr_user_access_administrator_role_assignment.result
   scope                = azurerm_container_registry.this.id
   role_definition_name = "User Access Administrator"
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
 resource "azurerm_role_assignment" "acr_pull" {
-  name                             = random_uuid.acr_pull_role_assignment.result
   scope                            = azurerm_container_registry.this.id
   role_definition_name             = "AcrPull"
   principal_id                     = azurerm_user_assigned_identity.this.principal_id
