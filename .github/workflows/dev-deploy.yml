@@ -20,6 +20,7 @@ env:
   TF_VAR_environment: dev
   TF_VAR_region: uksouth
   TF_VAR_container_registry_name: clinicflowaidev
+  TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
   TF_STATE_RESOURCE_GROUP: clinicflow-ai-tfstate-rg
   TF_STATE_STORAGE_ACCOUNT: clinicflowaitfstate
   TF_STATE_CONTAINER: tfstate
@@ -92,7 +93,8 @@ jobs:
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
-            -var="deploy_container_apps=false"
+            -var="deploy_container_apps=false" \
+            -var="deploy_postgres=true"
 
       - name: Capture Terraform outputs
         working-directory: infra/terraform
@@ -281,6 +283,7 @@ jobs:
           TF_VAR_environment: dev
           TF_VAR_region: uksouth
           TF_VAR_container_registry_name: clinicflowaidev
+          TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
 
       - name: Terraform destroy
         # Note: provider unregistration (e.g. Microsoft.App) is intentionally
@@ -296,6 +299,7 @@ jobs:
           TF_VAR_environment: dev
           TF_VAR_region: uksouth
           TF_VAR_container_registry_name: clinicflowaidev
+          TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
 
       - name: Cleanup summary
         shell: bash
