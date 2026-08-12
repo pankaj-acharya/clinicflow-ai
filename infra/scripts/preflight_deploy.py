@@ -125,7 +125,7 @@ def _output_value(outputs: dict[str, object], name: str) -> str:
 
 def _role_assignments(scope: str) -> list[dict[str, object]]:
     assignments = _az(
-        ["role", "assignment", "list", "--scope", scope, "--include-inherited", "--all", "-o", "json"],
+        ["role", "assignment", "list", "--scope", scope, "-o", "json"],
         expect_json=True,
     )
     if not isinstance(assignments, list):
