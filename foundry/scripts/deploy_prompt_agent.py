@@ -5,6 +5,7 @@ from pathlib import Path
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
+from azure.monitor.opentelemetry import configure_azure_monitor
 
 
 def _require_env(name: str) -> str:
@@ -12,6 +13,16 @@ def _require_env(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def _optional_env(name: str, default: str = "") -> str:
+    return os.getenv(name, default).strip()
+
+
+def _should_enable_insights() -> bool:
+    """Check if AppInsights logging is enabled via environment variable."""
+    enabled_str = _optional_env("ENABLE_FOUNDRY_INSIGHTS_LOGGING", "false").lower()
+    return enabled_str in ("true", "1", "yes", "on")
 
 
 def _build_instructions() -> str:
@@ -49,6 +60,20 @@ def main() -> None:
     model_deployment_name = _require_env("FOUNDRY_MODEL_DEPLOYMENT_NAME")
     agent_name = os.getenv("FOUNDRY_AGENT_NAME", "clinicflow-booking-assistant").strip() or "clinicflow-booking-assistant"
 
+    # Initialize AppInsights if enabled
+    if _should_enable_insights():
+        instrumentation_key = _optional_env("APPINSIGHTS_INSTRUMENTATION_KEY")
+        if instrumentation_key:
+            try:
+                configure_azure_monitor(instrumentation_key=instrumentation_key)
+                print(f"✅ AppInsights telemetry enabled for Foundry agent (key: {instrumentation_key[:20]}...)")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to configure AppInsights: {e}")
+        else:
+            print("⚠️ AppInsights logging enabled but no instrumentation key provided")
+    else:
+        print("ℹ️ AppInsights logging disabled for Foundry agent (set ENABLE_FOUNDRY_INSIGHTS_LOGGING=true to enable)")
+
     definition = PromptAgentDefinition(
         kind="prompt",
         model=model_deployment_name,
@@ -75,6 +100,7 @@ def main() -> None:
         "agent_version": agent_version.version,
         "model_deployment": model_deployment_name,
         "project_endpoint": project_endpoint,
+        "appinsights_enabled": _should_enable_insights(),
     }
 
     output_path = Path("foundry") / "foundry-deployment-result.json"

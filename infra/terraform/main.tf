@@ -290,6 +290,20 @@ resource "azurerm_key_vault_secret" "postgres_connection_string" {
   key_vault_id = azurerm_key_vault.this.id
 }
 
+# Feature flag: enable/disable Foundry agent logging to AppInsights
+resource "azurerm_key_vault_secret" "enable_foundry_insights_logging" {
+  name         = "enable-foundry-insights-logging"
+  value        = "true"
+  key_vault_id = azurerm_key_vault.this.id
+}
+
+# AppInsights instrumentation key for Foundry agent telemetry
+resource "azurerm_key_vault_secret" "appinsights_instrumentation_key" {
+  name         = "appinsights-instrumentation-key"
+  value        = azurerm_application_insights.this.instrumentation_key
+  key_vault_id = azurerm_key_vault.this.id
+}
+
 resource "azurerm_container_app" "gateway" {
   count                        = var.deploy_container_apps ? 1 : 0
   name                         = local.gateway_container_app_name
@@ -423,3 +437,4 @@ resource "azurerm_container_app" "web" {
     }
   }
 }
+
