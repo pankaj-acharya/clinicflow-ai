@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.5.0"
 
   backend "azurerm" {}
 }
@@ -199,6 +199,15 @@ resource "azurerm_key_vault_secret" "clinicflow_api_base_url" {
   key_vault_id = azurerm_key_vault.this.id
 }
 
+
+# ---------------------------------------------------------------------------
+# Import existing PostgreSQL server into Terraform state if not tracked yet.
+# Safe to keep permanently — Terraform skips if already in state.
+# ---------------------------------------------------------------------------
+import {
+  to = azurerm_postgresql_flexible_server.this[0]
+  id = "/subscriptions/3e430fb8-73f7-4930-a2ec-645fd80f5661/resourceGroups/clinicflow-ai-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/clinicflow-ai-dev-psql"
+}
 # ---------------------------------------------------------------------------
 # PostgreSQL Flexible Server
 # ---------------------------------------------------------------------------
