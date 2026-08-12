@@ -14,6 +14,8 @@ locals {
   api_container_app_name        = "${local.project_name}-${var.environment}-api"
   gateway_container_app_name    = "${local.project_name}-${var.environment}-gateway"
   key_vault_name                = substr(replace(lower("${local.project_name}${var.environment}kv"), "-", ""), 0, 24)
+  postgres_server_name          = "${local.project_name}-${var.environment}-psql"
+  postgres_db_name              = "clinicflow"
 }
 
 resource "azurerm_resource_group" "this" {
@@ -122,6 +124,15 @@ resource "azurerm_container_app" "api" {
     identity = azurerm_user_assigned_identity.this.id
   }
 
+  dynamic "secret" {
+    for_each = var.deploy_postgres ? [1] : []
+    content {
+      name                = "clinicflow-postgres-connection-string"
+      key_vault_secret_id = azurerm_key_vault_secret.postgres_connection_string[0].versionless_id
+      identity            = azurerm_user_assigned_identity.this.id
+    }
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -157,6 +168,14 @@ resource "azurerm_container_app" "api" {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.this.connection_string
       }
+
+      dynamic "env" {
+        for_each = var.deploy_postgres ? [1] : []
+        content {
+          name        = "ConnectionStrings__ClinicFlowDb"
+          secret_name = "clinicflow-postgres-connection-string"
+        }
+      }
     }
   }
 }
@@ -165,6 +184,39 @@ resource "azurerm_key_vault_secret" "clinicflow_api_base_url" {
   count        = var.deploy_container_apps ? 1 : 0
   name         = "clinicflow-api-base-url"
   value        = "https://${azurerm_container_app.api[0].ingress[0].fqdn}"
+  key_vault_id = azurerm_key_vault.this.id
+}
+
+# ---------------------------------------------------------------------------
+# PostgreSQL Flexible Server
+# ---------------------------------------------------------------------------
+
+resource "azurerm_postgresql_flexible_server" "this" {
+  count               = var.deploy_postgres ? 1 : 0
+  name                = local.postgres_server_name
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  version             = "16"
+  administrator_login    = var.postgres_admin_user
+  administrator_password = var.postgres_admin_password
+  storage_mb          = 32768
+  sku_name            = "B_Standard_B1ms"
+  zone                = "1"
+  backup_retention_days = 7
+}
+
+resource "azurerm_postgresql_flexible_server_database" "this" {
+  count     = var.deploy_postgres ? 1 : 0
+  name      = local.postgres_db_name
+  server_id = azurerm_postgresql_flexible_server.this[0].id
+  charset   = "utf8"
+  collation = "en_US.utf8"
+}
+
+resource "azurerm_key_vault_secret" "postgres_connection_string" {
+  count        = (var.deploy_postgres && var.deploy_container_apps) ? 1 : 0
+  name         = "clinicflow-postgres-connection-string"
+  value        = "Host=${azurerm_postgresql_flexible_server.this[0].fqdn};Database=${local.postgres_db_name};Username=${var.postgres_admin_user};Password=${var.postgres_admin_password};SslMode=Require"
   key_vault_id = azurerm_key_vault.this.id
 }
 

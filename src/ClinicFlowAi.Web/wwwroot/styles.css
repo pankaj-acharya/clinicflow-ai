@@ -2,3 +2,16 @@ body { font-family: sans-serif; margin: 2rem; }
 main { max-width: 40rem; }
 label { display: block; margin: 1rem 0; }
 input, button { padding: 0.5rem; }
+
+.ask-section { margin-bottom: 1.5rem; }
+#askPrompt { display: block; width: 100%; min-height: 5rem; padding: 0.5rem; box-sizing: border-box; font-family: inherit; font-size: 1rem; resize: vertical; }
+#askResults { list-style: none; padding: 0; }
+.slot-card { border: 1px solid #ccc; border-radius: 4px; padding: 0.75rem; margin: 0.5rem 0; background: #fafafa; }
+.book-btn { font-size: 0.85rem; padding: 0.3rem 0.7rem; background: #0070f3; color: #fff; border: none; border-radius: 3px; cursor: pointer; margin-top: 0.4rem; }
+.book-btn:hover { background: #0056c1; }
+
+.slot-card.booked { background: #f0f0f0; color: #888; }
+.slot-card.booked .book-btn { background: #aaa; cursor: not-allowed; }
+
+.booking-summary { border-left: 4px solid #4caf50; padding: 0.75rem 1rem; margin-top: 1rem; background: #f6fff6; }
+.booking-summary h3 { margin-top: 0; }

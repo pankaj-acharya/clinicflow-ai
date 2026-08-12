@@ -24,6 +24,30 @@ app.MapGet("/availability", async (HttpContext context, IHttpClientFactory httpC
 	return Results.Content(payload, contentType, null, (int)response.StatusCode);
 });
 
+app.MapPost("/ask", async (HttpContext context, IHttpClientFactory httpClientFactory) =>
+{
+	var client = httpClientFactory.CreateClient("ClinicFlowApi");
+	using var requestBody = new StreamContent(context.Request.Body);
+	requestBody.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+	using var response = await client.PostAsync("/ask", requestBody, context.RequestAborted);
+	var payload = await response.Content.ReadAsStringAsync(context.RequestAborted);
+	var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+
+	return Results.Content(payload, contentType, null, (int)response.StatusCode);
+});
+
+app.MapPost("/book", async (HttpContext context, IHttpClientFactory httpClientFactory) =>
+{
+	var client = httpClientFactory.CreateClient("ClinicFlowApi");
+	using var requestBody = new StreamContent(context.Request.Body);
+	requestBody.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+	using var response = await client.PostAsync("/bookings", requestBody, context.RequestAborted);
+	var payload = await response.Content.ReadAsStringAsync(context.RequestAborted);
+	var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+
+	return Results.Content(payload, contentType, null, (int)response.StatusCode);
+});
+
 app.Run();
 
 public partial class Program

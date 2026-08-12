@@ -9,14 +9,27 @@
 <body>
   <main>
     <h1>ClinicFlow AI</h1>
-    <p>Find an appointment slot.</p>
 
-    <label>Clinic ID <input id="clinicId" value="clinic-1" /></label>
-    <label>Clinician ID <input id="clinicianId" value="clinician-1" /></label>
-    <button id="load">Load availability</button>
+    <section class="ask-section">
+      <h2>Ask AI</h2>
+      <textarea id="askPrompt" rows="3" placeholder="e.g. Show me next available dentist appointment&#10;Next appointment with Hygienist Mrs Smith, preferably Monday/Tuesday/Friday morning&#10;Show me next 5 appointments with any dentist"></textarea>
+      <button id="askBtn">Ask AI</button>
+      <p id="askStatus" role="status" aria-live="polite"></p>
+      <ul id="askResults"></ul>
+      <div id="calendarView" hidden></div>
+    </section>
 
-    <p id="status" role="status" aria-live="polite"></p>
-    <ul id="slots"></ul>
+    <hr />
+
+    <section>
+      <h2>Availability</h2>
+      <p>Find an appointment slot.</p>
+      <label>Clinic ID <input id="clinicId" value="clinic-1" /></label>
+      <label>Clinician ID <input id="clinicianId" value="clinician-1" /></label>
+      <button id="load">Load availability</button>
+      <p id="status" role="status" aria-live="polite"></p>
+      <ul id="slots"></ul>
+    </section>
   </main>
   <script src="/app.js"></script>
 </body>
