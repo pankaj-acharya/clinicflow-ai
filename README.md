@@ -8,8 +8,8 @@ ClinicFlow AI is a .NET 10 solution with three runnable local hosts and a dev-re
 
 The current local experience is intentionally lightweight:
 
-- Availability and booking behavior run in-memory.
-- PostgreSQL persistence is still a placeholder and is not required for local testing.
+- Availability and booking behavior run in-memory by default.
+- PostgreSQL persistence is optional and enabled when a connection string is configured.
 - The web host forwards its local `/availability` requests to the API so the browser flow works without browser-side cross-origin setup.
 - The agent gateway now has a typed POST `/agents/booking/check-availability` path that forwards to the API and returns slots.
 
@@ -179,7 +179,8 @@ For the current local browser path:
 
 ## Current Scope Notes
 
-- Local availability responses are generated from in-memory domain rules in the API.
-- No PostgreSQL connection string is needed for the current local run path.
-- The infrastructure and persistence projects are present for future phases, but they are not part of the active local runtime loop yet.
-- The gateway check-availability route is now the first real agent-facing endpoint and should be the primary entry point for dev validation.
+- Local availability responses are generated from in-memory domain rules in the API by default.
+- PostgreSQL persistence is now integrated via EF Core migrations and can be enabled by setting the `ClinicFlowDb` connection string.
+- When PostgreSQL is configured, the API automatically uses real appointment data from the database.
+- The gateway check-availability route is the primary entry point for dev validation.
+- For Azure deployment details and PostgreSQL configuration, see [DEPLOYMENT.md](DEPLOYMENT.md).

@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using ClinicFlowAi.Domain;
 using ClinicFlowAi.Api;
+using ClinicFlowAi.Infrastructure.Postgres;
+using ClinicFlowAi.Infrastructure.Postgres.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,14 +13,50 @@ builder.Services.AddHttpClient("AgentGateway", client =>
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
+// Wire Postgres persistence when a connection string is present; otherwise the
+// API runs in in-memory mode (development default with no DB configured).
+var pgConnection = builder.Configuration.GetConnectionString("ClinicFlowDb");
+var postgresEnabled = !string.IsNullOrWhiteSpace(pgConnection);
+if (postgresEnabled)
+    builder.Services.AddPostgresInfrastructure(pgConnection!);
+
 var app = builder.Build();
+
+// Migrate and seed development data when Postgres is enabled.
+if (postgresEnabled && app.Environment.IsDevelopment())
+    await app.MigrateAndSeedAsync();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/availability", ([AsParameters] AvailabilityQuery query) =>
+app.MapGet("/availability", async ([AsParameters] AvailabilityQuery query, IAppointmentRepository? repo) =>
 {
+    // If Postgres is wired, use real data; otherwise fall back to in-memory stub
+    if (repo is not null)
+    {
+        try
+        {
+            var slots = await repo.GetAvailableSlotsAsync(
+                query.ClinicId,
+                query.ClinicianId,
+                null, // no role filtering at this layer
+                query.WindowStartUtc,
+                query.WindowEndUtc);
+            
+            return Results.Ok(slots.Select(s => new
+            {
+                s.StartsAtUtc,
+                s.EndsAtUtc
+            }));
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Postgres availability query failed, falling back to stub");
+        }
+    }
+
+    // Fallback to in-memory stub
     var engine = new BookingEngine();
-    var slots = engine.GetAvailability(
+    var domainSlots = engine.GetAvailability(
         query.WindowStartUtc,
         query.WindowEndUtc,
         [new ScheduleRule(query.ClinicId, query.ClinicianId, query.WindowStartUtc.UtcDateTime.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(10, 0))],
@@ -26,7 +64,7 @@ app.MapGet("/availability", ([AsParameters] AvailabilityQuery query) =>
         [],
         new AppointmentType(query.AppointmentTypeCode, query.AppointmentTypeCode, TimeSpan.FromMinutes(30)));
 
-    return Results.Ok(slots);
+    return Results.Ok(domainSlots);
 });
 
 app.MapPost("/slot-holds", (SlotHoldRequest request) =>
@@ -42,8 +80,32 @@ app.MapPost("/slot-holds", (SlotHoldRequest request) =>
     return Results.Ok(hold);
 });
 
-app.MapPost("/bookings", (BookingRequestDto request) =>
+app.MapPost("/bookings", async (BookingRequestDto request, IAppointmentRepository? repo) =>
 {
+    // If Postgres is wired, create booking with persistent slot marking
+    if (repo is not null)
+    {
+        try
+        {
+            var booking = await repo.CreateBookingAsync(
+                GenerateSlotId(request.ClinicianId, request.StartsAtUtc),
+                request.PatientReferenceId);
+            
+            return Results.Ok(new
+            {
+                booking.Id,
+                Status = booking.Status,
+                booking.Slot.StartsAtUtc,
+                booking.Slot.EndsAtUtc
+            });
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Postgres booking creation failed, falling back to stub");
+        }
+    }
+
+    // Fallback to in-memory stub
     var result = BookingEngine.ConfirmBooking(
         new BookingRequest(
             request.ClinicId,
@@ -146,6 +208,12 @@ app.MapPost("/ask", async (NlSchedulingRequest request, IHttpClientFactory httpC
 });
 
 app.Run();
+
+// Generate a deterministic slot ID from clinician ID and start time for lookup purposes
+static string GenerateSlotId(string clinicianId, DateTimeOffset startsAtUtc)
+{
+    return $"slot-{clinicianId}-{startsAtUtc:yyyyMMddHHmmss}".Replace(" ", "").ToLowerInvariant();
+}
 
 static IReadOnlyList<AvailableSlotOption> GenerateStubSlots(NlSchedulingRequest request, int count)
 {
