@@ -27,3 +27,22 @@ variable "gateway_image" {
   type    = string
   default = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 }
+
+variable "deploy_postgres" {
+  description = "Whether to provision Azure PostgreSQL Flexible Server."
+  type        = bool
+  default     = false
+}
+
+variable "postgres_admin_user" {
+  description = "PostgreSQL administrator login."
+  type        = string
+  default     = "clinicadmin"
+}
+
+variable "postgres_admin_password" {
+  description = "PostgreSQL administrator password. Store in CI secrets, never in tfvars."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
