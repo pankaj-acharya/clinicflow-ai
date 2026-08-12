@@ -23,8 +23,9 @@ if (postgresEnabled)
 
 var app = builder.Build();
 
-// Migrate and seed development data when Postgres is enabled.
-if (postgresEnabled && app.Environment.IsDevelopment())
+// Migrate schema and seed reference data whenever Postgres is enabled.
+// The seeder is idempotent — it skips if data already exists.
+if (postgresEnabled)
     await app.MigrateAndSeedAsync();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
