@@ -174,7 +174,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install azure-identity azure-ai-projects pyyaml
+          python -m pip install azure-identity azure-ai-projects httpx pyyaml
 
       - name: Preflight Foundry prerequisites
         shell: bash
