@@ -5,7 +5,6 @@ from pathlib import Path
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
-from azure.monitor.opentelemetry import configure_azure_monitor
 
 
 def _require_env(name: str) -> str:
@@ -61,18 +60,22 @@ def main() -> None:
     agent_name = os.getenv("FOUNDRY_AGENT_NAME", "clinicflow-booking-assistant").strip() or "clinicflow-booking-assistant"
 
     # Initialize AppInsights if enabled
-    if _should_enable_insights():
+    enable_insights = _should_enable_insights()
+    if enable_insights:
         instrumentation_key = _optional_env("APPINSIGHTS_INSTRUMENTATION_KEY")
         if instrumentation_key:
             try:
-                configure_azure_monitor(instrumentation_key=instrumentation_key)
-                print(f"✅ AppInsights telemetry enabled for Foundry agent (key: {instrumentation_key[:20]}...)")
+                # Lazy import to avoid startup delay if disabled
+                from azure.monitor.opentelemetry import configure_azure_monitor
+                # SDK reads APPINSIGHTS_INSTRUMENTATION_KEY from env automatically
+                configure_azure_monitor()
+                print(f"✅ AppInsights telemetry enabled (key: {instrumentation_key[:20]}...)")
             except Exception as e:
-                print(f"⚠️ Warning: Failed to configure AppInsights: {e}")
+                print(f"⚠️ Warning: AppInsights config skipped: {e}")
         else:
             print("⚠️ AppInsights logging enabled but no instrumentation key provided")
     else:
-        print("ℹ️ AppInsights logging disabled for Foundry agent (set ENABLE_FOUNDRY_INSIGHTS_LOGGING=true to enable)")
+        print("ℹ️ AppInsights logging disabled (ENABLE_FOUNDRY_INSIGHTS_LOGGING=false)")
 
     definition = PromptAgentDefinition(
         kind="prompt",

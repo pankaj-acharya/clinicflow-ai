@@ -161,3 +161,65 @@ dotnet run
 ```
 
 The API defaults to in-memory mode (no database connection required) unless the `ClinicFlowDb` connection string is configured in `appsettings.json`.
+
+## Foundry Agent Logging
+
+The Foundry booking assistant can emit telemetry to **both** Azure AI Foundry portal (always) and **Log Analytics Workspace** (optional, feature-flagged).
+
+### Overview
+
+- **Option A (Default)**: Logs only appear in Azure AI Foundry portal
+- **Option B (Feature Flag)**: Logs flow to both Foundry portal AND LAW (Log Analytics Workspace)
+  - Same logs visible in Foundry portal for agent debugging
+  - Unified application logs in LAW for production monitoring
+  - Toggle dynamically without redeployment
+
+This deployment uses **Option B** with a dynamic feature flag for demonstrations and A/B testing.
+
+### Toggle Foundry→LAW Logging
+
+The feature is controlled by a Key Vault secret: `enable-foundry-insights-logging`
+
+**To disable Foundry logging to LAW** (logs remain in Foundry portal):
+```bash
+az keyvault secret set \
+  --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging \
+  --value false
+```
+
+Next time the workflow runs, the agent deployment will skip AppInsights instrumentation.
+
+**To re-enable**:
+```bash
+az keyvault secret set \
+  --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging \
+  --value true
+```
+
+**Note**: No redeployment needed — the flag is read at agent startup during each workflow run.
+
+### Viewing Foundry Logs
+
+**Option B logs (in both places)**:
+
+1. **Azure AI Foundry Portal**: https://ai.azure.com
+   - Go to your project → **Agents** → **clinicflow-booking-assistant**
+   - View execution history and traces
+
+2. **Log Analytics Workspace (LAW)**: 
+   - Resource: `clinicflow-ai-law` in resource group `clinicflow-ai-dev-rg`
+   - Query: Filter by `OperationName` containing `foundry` or `agent`
+   ```kql
+   AppTraces
+   | where OperationName contains "foundry"
+   | project TimeGenerated, SeverityLevel, Message
+   ```
+
+**Comparing with other application logs**:
+- API logs: `AppRequests`, `AppExceptions`, `AppDependencies` (queries to PostgreSQL, calls to Foundry)
+- Web UI logs: `AppTraces` from the container app
+- Agent logs: `AppTraces` tagged with agent name (when Option B enabled)
+
+
