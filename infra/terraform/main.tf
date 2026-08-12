@@ -66,10 +66,6 @@ resource "azurerm_monitor_diagnostic_setting" "app_insights" {
     category = "AppDependencies"
   }
 
-  enabled_log {
-    category = "AppAvailability"
-  }
-
   metric {
     category = "AllMetrics"
     enabled  = true
