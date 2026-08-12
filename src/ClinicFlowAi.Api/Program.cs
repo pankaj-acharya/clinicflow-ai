@@ -120,7 +120,7 @@ app.MapPost("/bookings", async (BookingRequestDto request, [FromServices] IAppoi
     return Results.Ok(result);
 });
 
-app.MapPost("/ask", async (NlSchedulingRequest request, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
+app.MapPost("/ask", async (NlSchedulingRequest request, [FromServices] IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
 {
     // --- Input validation ---
     if (string.IsNullOrWhiteSpace(request.Prompt))
