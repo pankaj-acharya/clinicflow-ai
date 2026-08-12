@@ -162,64 +162,237 @@ dotnet run
 
 The API defaults to in-memory mode (no database connection required) unless the `ClinicFlowDb` connection string is configured in `appsettings.json`.
 
-## Foundry Agent Logging
+## Foundry Agent Logging (Option B: Unified Observability)
 
-The Foundry booking assistant can emit telemetry to **both** Azure AI Foundry portal (always) and **Log Analytics Workspace** (optional, feature-flagged).
+The Foundry booking assistant emits telemetry to **both** Azure AI Foundry portal (always) and **Log Analytics Workspace (LAW)** (optional, feature-flagged). This enables unified monitoring without code redeployment.
 
-### Overview
+### Architecture Overview
 
-- **Option A (Default)**: Logs only appear in Azure AI Foundry portal
-- **Option B (Feature Flag)**: Logs flow to both Foundry portal AND LAW (Log Analytics Workspace)
-  - Same logs visible in Foundry portal for agent debugging
-  - Unified application logs in LAW for production monitoring
-  - Toggle dynamically without redeployment
+```
+Foundry Agent Deployment (GitHub Actions)
+    ↓
+    ├─→ Reads ENABLE_FOUNDRY_INSIGHTS_LOGGING from Key Vault secret
+    ├─→ Reads APPINSIGHTS_INSTRUMENTATION_KEY from Key Vault secret
+    ↓
+Deploy Prompt Agent Script (foundry/scripts/deploy_prompt_agent.py)
+    ├─→ If enabled: Initialize Azure Monitor OpenTelemetry SDK
+    ├─→ Deploy agent version to Foundry
+    ├─→ Output: appinsights_enabled: true/false flag
+    ↓
+At Runtime:
+    ├─→ Foundry Portal: Agent execution always logged (independent)
+    └─→ LAW: Agent traces sent (if feature flag enabled)
+```
 
-This deployment uses **Option B** with a dynamic feature flag for demonstrations and A/B testing.
+### Feature Flag Details
 
-### Toggle Foundry→LAW Logging
+**Implementation**:
+- Controlled by Key Vault secret: `enable-foundry-insights-logging`
+- Read during **each workflow run** (not at deployment time)
+- No code changes or redeployment needed to toggle
 
-The feature is controlled by a Key Vault secret: `enable-foundry-insights-logging`
+**Default state**: `true` (logs flow to LAW)
 
-**To disable Foundry logging to LAW** (logs remain in Foundry portal):
+**Behavior**:
+- When `true` (enabled):
+  - Azure Monitor OpenTelemetry SDK initializes during agent deployment
+  - Agent execution logs sent to AppInsights → flows to LAW
+  - Logs also appear in Foundry portal (independent)
+  - Both portals show the same agent traces
+  
+- When `false` (disabled):
+  - Azure Monitor SDK not initialized
+  - Agent only logs to Foundry portal
+  - LAW receives no agent telemetry (faster startup, fewer AppInsights ingestion units)
+
+### How to Toggle Foundry→LAW Logging
+
+The feature is controlled dynamically via Azure Key Vault. **No redeployment needed.**
+
+#### Disable (Logs stay in Foundry portal only)
+
 ```bash
 az keyvault secret set \
   --vault-name clinicflowaidevkv \
   --name enable-foundry-insights-logging \
   --value false
+
+# Verify (optional)
+az keyvault secret show \
+  --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging \
+  --query value -o tsv
+# Output: false
 ```
 
-Next time the workflow runs, the agent deployment will skip AppInsights instrumentation.
+Next time you run the workflow:
+- Agent deployment will show `appinsights_enabled: false` in the output
+- Logs only appear in Foundry portal
+- No logs sent to LAW
 
-**To re-enable**:
+#### Re-enable (Logs flow to both Foundry and LAW)
+
 ```bash
 az keyvault secret set \
   --vault-name clinicflowaidevkv \
   --name enable-foundry-insights-logging \
   --value true
+
+# Verify (optional)
+az keyvault secret show \
+  --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging \
+  --query value -o tsv
+# Output: true
 ```
 
-**Note**: No redeployment needed — the flag is read at agent startup during each workflow run.
+Next workflow run: Agent logs flow to both portals.
 
-### Viewing Foundry Logs
+### Viewing Foundry Agent Logs
 
-**Option B logs (in both places)**:
+#### Option 1: Azure AI Foundry Portal (Always Available)
 
-1. **Azure AI Foundry Portal**: https://ai.azure.com
-   - Go to your project → **Agents** → **clinicflow-booking-assistant**
-   - View execution history and traces
+Foundry portal shows agent execution regardless of the LAW feature flag.
 
-2. **Log Analytics Workspace (LAW)**: 
-   - Resource: `clinicflow-ai-law` in resource group `clinicflow-ai-dev-rg`
-   - Query: Filter by `OperationName` containing `foundry` or `agent`
-   ```kql
-   AppTraces
-   | where OperationName contains "foundry"
-   | project TimeGenerated, SeverityLevel, Message
+1. Go to https://ai.azure.com
+2. Select your project
+3. Navigate to **Agents** → **clinicflow-booking-assistant**
+4. View:
+   - Execution history (each agent invocation)
+   - Tool calls and responses
+   - Token usage and latency
+   - Error traces (if any)
+
+**Best for**: Agent behavior debugging, tool call inspection, cost tracking
+
+#### Option 2: Log Analytics Workspace (When Feature Flag = true)
+
+LAW provides unified view of all application logs + agent traces.
+
+**Access LAW**:
+1. Go to Azure Portal
+2. Find resource group `clinicflow-ai-dev-rg`
+3. Click on `clinicflow-ai-law` (Log Analytics Workspace)
+4. Click **Logs** (KQL editor)
+
+**Query agent traces**:
+
+```kql
+// All agent-related traces
+AppTraces
+| where OperationName contains "foundry" or OperationName contains "agent"
+| project TimeGenerated, SeverityLevel, Message, OperationName
+| order by TimeGenerated desc
+| limit 100
+```
+
+**Query by severity**:
+
+```kql
+// Errors only
+AppTraces
+| where (OperationName contains "agent" or OperationName contains "foundry")
+  and SeverityLevel in ("2", "3")  // Warning=1, Error=2, Critical=3
+| project TimeGenerated, Message, OperationName
+| order by TimeGenerated desc
+```
+
+**Correlate with API calls**:
+
+```kql
+// API request → Foundry agent call correlation
+AppRequests
+| where Name == "POST /ask"
+| join kind=inner (
+    AppTraces
+    | where OperationName contains "foundry"
+  ) on $left.OperationId == $right.OperationId
+| project TimeGenerated, Name, ResultCode, Message
+| order by TimeGenerated desc
+```
+
+### Unified Application Observability
+
+When feature flag is **enabled**, see all telemetry in one place:
+
+| Log Source | Table | Description |
+|-----------|-------|-------------|
+| **API Service** | `AppRequests` | HTTP requests to `/health`, `/availability`, `/ask`, `/bookings` |
+| | `AppExceptions` | Errors (database connection, validation, Foundry call failures) |
+| | `AppDependencies` | External calls (PostgreSQL queries, Foundry agent invocations) |
+| **Web UI** | `AppTraces` | Container app logs (asset loads, API call results) |
+| **Foundry Agent** | `AppTraces` | Agent execution, tool calls, LLM responses (when flag = true) |
+
+**Example unified query**:
+
+```kql
+// All service activities in last 1 hour
+union
+  (AppRequests | project TimeGenerated, Service="API", Name, ResultCode),
+  (AppTraces | project TimeGenerated, Service="Agent", Message, SeverityLevel),
+  (AppDependencies | project TimeGenerated, Service="Dependencies", Name, DurationMs)
+| where TimeGenerated > ago(1h)
+| order by TimeGenerated desc
+```
+
+### Performance Considerations
+
+**When feature flag is enabled**:
+- AppInsights SDK initializes during agent deployment (one-time, <5s)
+- Minimal runtime overhead; traces batched and sent asynchronously
+- LAW ingestion cost: ~$0.005 per gigabyte
+
+**When feature flag is disabled**:
+- No AppInsights SDK load or initialization
+- Agent deployment faster
+- No LAW ingestion cost
+- Logs still available in Foundry portal
+
+### Troubleshooting
+
+**Problem**: Agent deployment shows `appinsights_enabled: false` but I expected `true`
+
+**Solution**: Check the feature flag value:
+```bash
+az keyvault secret show --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging --query value -o tsv
+```
+
+If it shows `false`, re-enable:
+```bash
+az keyvault secret set --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging --value true
+```
+
+Re-run the workflow.
+
+---
+
+**Problem**: Logs appear in Foundry portal but not in LAW
+
+**Possible causes**:
+1. Feature flag is `false` — check key vault secret
+2. LAW workspace has not received data yet (5-10 min delay)
+3. AppInsights SDK initialization failed (check workflow logs for warnings)
+
+**Solution**:
+1. Verify feature flag is `true`
+2. Wait 10 minutes and retry LAW query
+3. Check workflow logs:
+   ```bash
+   gh run view <run-id> --log | grep -i "appinsights"
    ```
 
-**Comparing with other application logs**:
-- API logs: `AppRequests`, `AppExceptions`, `AppDependencies` (queries to PostgreSQL, calls to Foundry)
-- Web UI logs: `AppTraces` from the container app
-- Agent logs: `AppTraces` tagged with agent name (when Option B enabled)
+---
+
+**Problem**: Want to see logs in Foundry portal for demo but not clutter LAW
+
+**Solution**: Toggle feature flag to `false` before demo:
+```bash
+az keyvault secret set --vault-name clinicflowaidevkv \
+  --name enable-foundry-insights-logging --value false
+```
+
+Agent still logs to Foundry portal; LAW stays clean. Re-enable after demo.
 
 
