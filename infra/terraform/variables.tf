@@ -31,7 +31,7 @@ variable "gateway_image" {
 variable "deploy_postgres" {
   description = "Whether to provision Azure PostgreSQL Flexible Server."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "postgres_admin_user" {
