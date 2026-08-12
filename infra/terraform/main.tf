@@ -173,7 +173,7 @@ resource "azurerm_container_app" "api" {
 
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
-        value = var.environment
+        value = "Development"
       }
 
       env {
@@ -283,7 +283,7 @@ resource "azurerm_container_app" "gateway" {
 
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
-        value = var.environment
+        value = "Development"
       }
 
       env {
