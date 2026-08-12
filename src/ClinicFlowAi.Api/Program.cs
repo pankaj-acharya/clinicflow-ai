@@ -3,6 +3,7 @@ using ClinicFlowAi.Domain;
 using ClinicFlowAi.Api;
 using ClinicFlowAi.Infrastructure.Postgres;
 using ClinicFlowAi.Infrastructure.Postgres.Persistence;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +29,7 @@ if (postgresEnabled && app.Environment.IsDevelopment())
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/availability", async ([AsParameters] AvailabilityQuery query, IAppointmentRepository? repo) =>
+app.MapGet("/availability", async ([AsParameters] AvailabilityQuery query, [FromServices] IAppointmentRepository? repo) =>
 {
     // If Postgres is wired, use real data; otherwise fall back to in-memory stub
     if (repo is not null)
@@ -80,7 +81,7 @@ app.MapPost("/slot-holds", (SlotHoldRequest request) =>
     return Results.Ok(hold);
 });
 
-app.MapPost("/bookings", async (BookingRequestDto request, IAppointmentRepository? repo) =>
+app.MapPost("/bookings", async (BookingRequestDto request, [FromServices] IAppointmentRepository? repo) =>
 {
     // If Postgres is wired, create booking with persistent slot marking
     if (repo is not null)
