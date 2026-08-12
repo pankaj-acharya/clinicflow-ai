@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using ClinicFlowAi.Domain;
 using ClinicFlowAi.Api;
 using ClinicFlowAi.Infrastructure.Postgres;
+using ClinicFlowAi.Infrastructure.Postgres.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,10 +28,35 @@ if (postgresEnabled && app.Environment.IsDevelopment())
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/availability", ([AsParameters] AvailabilityQuery query) =>
+app.MapGet("/availability", async ([AsParameters] AvailabilityQuery query, IAppointmentRepository? repo) =>
 {
+    // If Postgres is wired, use real data; otherwise fall back to in-memory stub
+    if (repo is not null)
+    {
+        try
+        {
+            var slots = await repo.GetAvailableSlotsAsync(
+                query.ClinicId,
+                query.ClinicianId,
+                null, // no role filtering at this layer
+                query.WindowStartUtc,
+                query.WindowEndUtc);
+            
+            return Results.Ok(slots.Select(s => new
+            {
+                s.StartsAtUtc,
+                s.EndsAtUtc
+            }));
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Postgres availability query failed, falling back to stub");
+        }
+    }
+
+    // Fallback to in-memory stub
     var engine = new BookingEngine();
-    var slots = engine.GetAvailability(
+    var domainSlots = engine.GetAvailability(
         query.WindowStartUtc,
         query.WindowEndUtc,
         [new ScheduleRule(query.ClinicId, query.ClinicianId, query.WindowStartUtc.UtcDateTime.DayOfWeek, new TimeOnly(9, 0), new TimeOnly(10, 0))],
@@ -38,7 +64,7 @@ app.MapGet("/availability", ([AsParameters] AvailabilityQuery query) =>
         [],
         new AppointmentType(query.AppointmentTypeCode, query.AppointmentTypeCode, TimeSpan.FromMinutes(30)));
 
-    return Results.Ok(slots);
+    return Results.Ok(domainSlots);
 });
 
 app.MapPost("/slot-holds", (SlotHoldRequest request) =>
