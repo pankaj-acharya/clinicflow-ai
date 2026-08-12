@@ -40,6 +40,42 @@ resource "azurerm_application_insights" "this" {
   application_type    = "web"
 }
 
+# Enable diagnostic settings for Application Insights to stream all logs/metrics to LAW
+resource "azurerm_monitor_diagnostic_setting" "app_insights" {
+  name                       = "send-to-law"
+  target_resource_id         = azurerm_application_insights.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "AppTraces"
+  }
+
+  enabled_log {
+    category = "AppEvents"
+  }
+
+  enabled_log {
+    category = "AppExceptions"
+  }
+
+  enabled_log {
+    category = "AppRequests"
+  }
+
+  enabled_log {
+    category = "AppDependencies"
+  }
+
+  enabled_log {
+    category = "AppAvailability"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
 resource "azurerm_user_assigned_identity" "this" {
   name                = local.managed_identity_name
   location            = azurerm_resource_group.this.location

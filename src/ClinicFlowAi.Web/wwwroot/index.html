@@ -3,47 +3,107 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ClinicFlow AI</title>
+  <title>ClinicFlow AI - Appointment Booking</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <main>
-    <h1>ClinicFlow AI</h1>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo-icon">📅</div>
+          <div>
+            <h1>ClinicFlow AI</h1>
+            <p class="tagline">Smart Appointment Scheduling</p>
+          </div>
+        </div>
+        <div class="header-status">
+          <span class="status-badge online">● Live</span>
+        </div>
+      </div>
+    </header>
 
-    <section class="ask-section">
-      <h2>&#129302; Ask AI to find an appointment</h2>
-      <textarea id="askPrompt" rows="3" placeholder="e.g. Show me next available dentist appointment&#10;Next appointment with Hygienist Mrs Smith, preferably Monday/Tuesday/Friday morning&#10;Show me next 5 appointments with any dentist"></textarea>
-      <button id="askBtn">Ask AI</button>
-      <p id="askStatus" role="status" aria-live="polite"></p>
-      <ul id="askResults"></ul>
-      <div id="calendarView" hidden></div>
-    </section>
+    <main class="main-content">
+      <!-- AI Assistant Section -->
+      <section class="hero-section">
+        <div class="section-card ai-card">
+          <div class="section-header">
+            <span class="section-icon">🤖</span>
+            <h2>AI Assistant</h2>
+          </div>
+          <p class="section-description">Describe what you're looking for in natural language, and our AI will find the perfect appointment slot for you.</p>
+          
+          <div class="form-group">
+            <label for="askPrompt">What appointment are you looking for?</label>
+            <textarea 
+              id="askPrompt" 
+              placeholder="Examples:&#10;• Show me next available dentist appointment&#10;• Next appointment with Hygienist Mrs Smith, preferably Monday morning&#10;• Find 5 available appointments with any dentist"
+              rows="4"></textarea>
+          </div>
+          
+          <button id="askBtn" class="btn btn-primary btn-lg">
+            <span class="btn-icon">✨</span> Ask AI
+          </button>
+          
+          <div id="askStatus" class="status-message"></div>
+          <ul id="askResults" class="results-list"></ul>
+          <div id="calendarView" class="calendar-confirmation"></div>
+        </div>
+      </section>
 
-    <hr />
+      <!-- Browse Section -->
+      <section class="browse-section">
+        <div class="section-divider">
+          <span>or</span>
+        </div>
 
-    <section>
-      <h2>&#128197; Browse availability directly</h2>
-      <p>Select a clinician and load available slots for the next 14 days.</p>
-      <label>Clinic ID <input id="clinicId" value="clinic-1" /></label>
-      <label>Clinician
-        <select id="clinicianId">
-          <option value="clinician-dentist-1">Dr. James Harper (Dentist)</option>
-          <option value="clinician-dentist-2">Dr. Sarah Okafor (Dentist)</option>
-          <option value="clinician-hygienist-1">Mrs. Lisa Smith (Hygienist)</option>
-          <option value="clinician-hygienist-2">Mr. David Chen (Hygienist)</option>
-        </select>
-      </label>
-      <label>Appointment type
-        <select id="appointmentTypeCode">
-          <option value="exam">Exam (Dentist)</option>
-          <option value="hygiene">Hygiene (Hygienist)</option>
-        </select>
-      </label>
-      <button id="load">Load availability</button>
-      <p id="status" role="status" aria-live="polite"></p>
-      <ul id="slots"></ul>
-    </section>
-  </main>
+        <div class="section-card browse-card">
+          <div class="section-header">
+            <span class="section-icon">📋</span>
+            <h2>Browse Availability</h2>
+          </div>
+          <p class="section-description">Search for available appointments by selecting a specific clinician and viewing their next 14 days of availability.</p>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="clinicId">Clinic</label>
+              <input id="clinicId" type="text" value="clinic-1" readonly class="form-control-static" />
+            </div>
+
+            <div class="form-group">
+              <label for="clinicianId">Clinician</label>
+              <select id="clinicianId" class="form-select">
+                <option value="clinician-dentist-1">👨‍⚕️ Dr. James Harper (Dentist)</option>
+                <option value="clinician-dentist-2">👩‍⚕️ Dr. Sarah Okafor (Dentist)</option>
+                <option value="clinician-hygienist-1">👩‍⚕️ Mrs. Lisa Smith (Hygienist)</option>
+                <option value="clinician-hygienist-2">👨‍⚕️ Mr. David Chen (Hygienist)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="appointmentTypeCode">Service Type</label>
+              <select id="appointmentTypeCode" class="form-select">
+                <option value="exam">Exam (Dentist)</option>
+                <option value="hygiene">Hygiene (Hygienist)</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="load" class="btn btn-secondary btn-lg">
+            <span class="btn-icon">🔍</span> Load Availability
+          </button>
+
+          <div id="status" class="status-message"></div>
+          <ul id="slots" class="results-list"></ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>&copy; 2026 ClinicFlow AI. Powered by Azure AI.</p>
+    </footer>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
