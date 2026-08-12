@@ -23,28 +23,12 @@ resource "azurerm_resource_group" "this" {
   location = var.region
 }
 
-resource "azurerm_resource_provider_registration" "required" {
-  for_each = toset([
-    "Microsoft.CognitiveServices",
-    "Microsoft.ContainerRegistry",
-    "microsoft.insights",
-    "Microsoft.KeyVault",
-    "Microsoft.ManagedIdentity",
-    "Microsoft.OperationalInsights",
-    "Microsoft.Storage"
-  ])
-
-  name = each.value
-}
-
 resource "azurerm_log_analytics_workspace" "this" {
   name                = local.log_analytics_workspace_name
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
-
-  depends_on = [azurerm_resource_provider_registration.required]
 }
 
 resource "azurerm_application_insights" "this" {
@@ -53,8 +37,6 @@ resource "azurerm_application_insights" "this" {
   resource_group_name = azurerm_resource_group.this.name
   workspace_id        = azurerm_log_analytics_workspace.this.id
   application_type    = "web"
-
-  depends_on = [azurerm_resource_provider_registration.required]
 }
 
 resource "azurerm_user_assigned_identity" "this" {
@@ -62,7 +44,6 @@ resource "azurerm_user_assigned_identity" "this" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
 
-  depends_on = [azurerm_resource_provider_registration.required]
 }
 
 resource "azurerm_container_registry" "this" {
@@ -71,8 +52,6 @@ resource "azurerm_container_registry" "this" {
   resource_group_name = azurerm_resource_group.this.name
   sku                 = "Standard"
   admin_enabled       = false
-
-  depends_on = [azurerm_resource_provider_registration.required]
 }
 
 resource "random_uuid" "acr_pull_role_assignment" {}
@@ -114,8 +93,6 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days  = 7
   enabled_for_disk_encryption = true
 
-  depends_on = [azurerm_resource_provider_registration.required]
-
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = data.azurerm_client_config.current.object_id
@@ -148,8 +125,6 @@ resource "azurerm_container_app_environment" "this" {
   location                   = azurerm_resource_group.this.location
   resource_group_name        = azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  depends_on = [azurerm_resource_provider_registration.required]
 }
 
 resource "azurerm_container_app" "api" {
