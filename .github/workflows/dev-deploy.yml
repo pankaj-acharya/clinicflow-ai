@@ -28,8 +28,10 @@ env:
   IMAGE_TAG: ${{ github.sha }}
   API_IMAGE: clinicflowaidev.azurecr.io/clinicflow-ai-api:${{ github.sha }}
   GATEWAY_IMAGE: clinicflowaidev.azurecr.io/clinicflow-ai-gateway:${{ github.sha }}
+  WEB_IMAGE: clinicflowaidev.azurecr.io/clinicflow-ai-web:${{ github.sha }}
   API_IMAGE_NAME: clinicflow-ai-api
   GATEWAY_IMAGE_NAME: clinicflow-ai-gateway
+  WEB_IMAGE_NAME: clinicflow-ai-web
 
 jobs:
   deploy-infrastructure-and-apps:
@@ -127,13 +129,22 @@ jobs:
           docker push "$GATEWAY_IMAGE"
           docker push "$ACR_LOGIN_SERVER/$GATEWAY_IMAGE_NAME:${GITHUB_SHA}"
 
+      - name: Build and push Web UI image
+        shell: bash
+        run: |
+          ACR_LOGIN_SERVER=$(python -c "import json; from pathlib import Path; data=json.loads(Path('terraform-outputs.json').read_text(encoding='utf-8')); print(data['container_registry_login_server']['value'])")
+          docker build -f src/ClinicFlowAi.Web/Dockerfile -t "$WEB_IMAGE" -t "$ACR_LOGIN_SERVER/$WEB_IMAGE_NAME:${GITHUB_SHA}" .
+          docker push "$WEB_IMAGE"
+          docker push "$ACR_LOGIN_SERVER/$WEB_IMAGE_NAME:${GITHUB_SHA}"
+
       - name: Terraform apply application layer
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
             -var="deploy_container_apps=true" \
             -var="api_image=${API_IMAGE}" \
-            -var="gateway_image=${GATEWAY_IMAGE}"
+            -var="gateway_image=${GATEWAY_IMAGE}" \
+            -var="web_image=${WEB_IMAGE}"
 
       - name: Show deployed endpoints
         working-directory: infra/terraform

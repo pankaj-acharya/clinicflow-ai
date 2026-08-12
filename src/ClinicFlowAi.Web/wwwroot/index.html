@@ -11,7 +11,7 @@
     <h1>ClinicFlow AI</h1>
 
     <section class="ask-section">
-      <h2>Ask AI</h2>
+      <h2>&#129302; Ask AI to find an appointment</h2>
       <textarea id="askPrompt" rows="3" placeholder="e.g. Show me next available dentist appointment&#10;Next appointment with Hygienist Mrs Smith, preferably Monday/Tuesday/Friday morning&#10;Show me next 5 appointments with any dentist"></textarea>
       <button id="askBtn">Ask AI</button>
       <p id="askStatus" role="status" aria-live="polite"></p>
@@ -22,10 +22,23 @@
     <hr />
 
     <section>
-      <h2>Availability</h2>
-      <p>Find an appointment slot.</p>
+      <h2>&#128197; Browse availability directly</h2>
+      <p>Select a clinician and load available slots for the next 14 days.</p>
       <label>Clinic ID <input id="clinicId" value="clinic-1" /></label>
-      <label>Clinician ID <input id="clinicianId" value="clinician-1" /></label>
+      <label>Clinician
+        <select id="clinicianId">
+          <option value="clinician-dentist-1">Dr. James Harper (Dentist)</option>
+          <option value="clinician-dentist-2">Dr. Sarah Okafor (Dentist)</option>
+          <option value="clinician-hygienist-1">Mrs. Lisa Smith (Hygienist)</option>
+          <option value="clinician-hygienist-2">Mr. David Chen (Hygienist)</option>
+        </select>
+      </label>
+      <label>Appointment type
+        <select id="appointmentTypeCode">
+          <option value="exam">Exam (Dentist)</option>
+          <option value="hygiene">Hygiene (Hygienist)</option>
+        </select>
+      </label>
       <button id="load">Load availability</button>
       <p id="status" role="status" aria-live="polite"></p>
       <ul id="slots"></ul>

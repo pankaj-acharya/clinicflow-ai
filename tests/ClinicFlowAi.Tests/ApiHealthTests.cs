@@ -77,6 +77,62 @@ public sealed class HostSmokeTests
     }
 
     [TestMethod]
+    public async Task Web_ask_proxies_request_body_to_api()
+    {
+        const string payload = "[{\"clinicianId\":\"clinician-dentist-1\",\"startsAtUtc\":\"2026-08-11T09:00:00Z\",\"endsAtUtc\":\"2026-08-11T09:30:00Z\"}]";
+
+        var handler = new CapturingHttpMessageHandler(payload);
+
+        await using var factory = new WebApplicationFactory<WebHost::Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureServices(services =>
+                {
+                    services.AddHttpClient("ClinicFlowApi")
+                        .ConfigurePrimaryHttpMessageHandler(() => handler);
+                });
+            });
+
+        using var client = factory.CreateClient();
+        var body = new StringContent("{\"prompt\":\"next available dentist\",\"maxResults\":3}", Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/ask", body);
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        StringAssert.Contains(content, "clinician-dentist-1");
+        Assert.AreEqual(HttpMethod.Post, handler.LastMethod);
+        StringAssert.Contains(handler.LastRequestUri!.ToString(), "/ask");
+    }
+
+    [TestMethod]
+    public async Task Web_book_proxies_booking_to_api_and_returns_response()
+    {
+        const string payload = "{\"id\":\"apt-123\",\"status\":\"confirmed\"}";
+
+        var handler = new CapturingHttpMessageHandler(payload);
+
+        await using var factory = new WebApplicationFactory<WebHost::Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureServices(services =>
+                {
+                    services.AddHttpClient("ClinicFlowApi")
+                        .ConfigurePrimaryHttpMessageHandler(() => handler);
+                });
+            });
+
+        using var client = factory.CreateClient();
+        var body = new StringContent("{\"clinicId\":\"clinic-1\",\"clinicianId\":\"clinician-dentist-1\",\"patientReferenceId\":\"web-user\",\"startsAtUtc\":\"2026-08-11T09:00:00Z\",\"endsAtUtc\":\"2026-08-11T09:30:00Z\"}", Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/book", body);
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        StringAssert.Contains(content, "confirmed");
+        Assert.AreEqual(HttpMethod.Post, handler.LastMethod);
+        StringAssert.Contains(handler.LastRequestUri!.ToString(), "/bookings");
+    }
+
+    [TestMethod]
     public async Task Agent_gateway_health_returns_ok()
     {
         await using var factory = new WebApplicationFactory<GatewayHost::Program>();

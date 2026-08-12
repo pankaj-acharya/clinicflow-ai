@@ -40,6 +40,11 @@ variable "postgres_admin_user" {
   default     = "clinicadmin"
 }
 
+variable "web_image" {
+  type    = string
+  default = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+}
+
 variable "postgres_admin_password" {
   description = "PostgreSQL administrator password. Store in CI secrets, never in tfvars."
   type        = string

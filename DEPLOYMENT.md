@@ -50,7 +50,7 @@ The API automatically:
 The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 
 1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, etc.)
-2. **Container Apps** (API and Agent Gateway deployments)
+2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
 3. **Foundry Agent** (Booking assistant deployment)
 4. **Cleanup** (Optional: destroys resources or just Foundry agents)
 
@@ -62,9 +62,58 @@ The `dev-deploy.yml` workflow runs on manual dispatch and performs:
    - `destroy_resources`: Set to `true` to delete all cloud resources (use to avoid costs)
    - `destroy_foundry_agents`: Set to `true` to delete only agents/models
 
+## Live Endpoints (dev environment)
+
+After a successful deployment the following URLs are active:
+
+| Service | URL |
+|---------|-----|
+| **Web UI** | `https://clinicflow-ai-dev-web.<hash>.uksouth.azurecontainerapps.io` |
+| **API** | `https://clinicflow-ai-dev-api.<hash>.uksouth.azurecontainerapps.io` |
+| **Agent Gateway** | `https://clinicflow-ai-dev-gateway.<hash>.uksouth.azurecontainerapps.io` |
+
+The exact FQDNs are emitted by `terraform output` at the end of the workflow (look for `web_url`, `api_url`, `gateway_url`).
+
+## End-to-End User Journey
+
+1. Open the **Web UI** URL in a browser.
+2. In the **Ask AI** section, type a natural-language prompt such as:
+   - `Show me next available dentist appointment`
+   - `When is the next appointment with Hygienist Mrs Smith, preferably Monday morning?`
+   - `Show me next 5 appointments with any dentist`
+3. Click **Ask AI** — the Web UI calls `/ask` → API → Azure AI Foundry agent → LLM.
+4. The AI returns matching slots; click **Book this** on any slot.
+5. The UI POSTs `/book` → API → PostgreSQL; a ✅ calendar confirmation card appears.
+6. To browse raw availability without AI, scroll down to the **Browse availability** section, choose a clinician from the dropdown, and click **Load availability**. Slots for the next 14 days are displayed.
+
 ## API Endpoints
 
 Once deployed, the following endpoints are available:
+
+- `GET /health` - Service health check
+- `GET /availability` - Query available appointment slots
+  - Falls back to in-memory stub if PostgreSQL unavailable
+- `POST /bookings` - Create an appointment booking
+  - Uses PostgreSQL when available, in-memory stub otherwise
+- `POST /slot-holds` - Create a temporary slot hold
+- `POST /ask` - Natural language scheduling request to Foundry agent
+
+### Example: Check availability
+
+```
+GET /availability?ClinicId=clinic-1&ClinicianId=clinician-dentist-1&WindowStartUtc=<today ISO>&WindowEndUtc=<+14d ISO>&AppointmentTypeCode=exam
+```
+
+Seeded clinician IDs:
+
+| ID | Name | Role |
+|----|------|------|
+| `clinician-dentist-1` | Dr. James Harper | Dentist |
+| `clinician-dentist-2` | Dr. Sarah Okafor | Dentist |
+| `clinician-hygienist-1` | Mrs. Lisa Smith | Hygienist |
+| `clinician-hygienist-2` | Mr. David Chen | Hygienist |
+
+
 
 - `GET /health` - Service health check
 - `GET /availability` - Query available appointment slots

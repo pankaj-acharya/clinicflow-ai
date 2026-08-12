@@ -13,6 +13,7 @@ locals {
   container_apps_environment   = "${local.project_name}-${var.environment}-cae"
   api_container_app_name       = "${local.project_name}-${var.environment}-api"
   gateway_container_app_name   = "${local.project_name}-${var.environment}-gateway"
+  web_container_app_name       = "${local.project_name}-${var.environment}-web"
   key_vault_name               = substr(replace(lower("${local.project_name}${var.environment}kv"), "-", ""), 0, 24)
   postgres_server_name         = "${local.project_name}-${var.environment}-psql"
   postgres_db_name             = "clinicflow"
@@ -291,6 +292,73 @@ resource "azurerm_container_app" "gateway" {
     container {
       name   = "gateway"
       image  = var.gateway_image
+      cpu    = 0.25
+      memory = "0.5Gi"
+
+      env {
+        name  = "ASPNETCORE_URLS"
+        value = "http://+:8080"
+      }
+
+      env {
+        name  = "ASPNETCORE_ENVIRONMENT"
+        value = "Development"
+      }
+
+      env {
+        name        = "ClinicFlowApi__BaseUrl"
+        secret_name = "clinicflow-api-base-url"
+      }
+
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.this.connection_string
+      }
+    }
+  }
+}
+
+resource "azurerm_container_app" "web" {
+  count                        = var.deploy_container_apps ? 1 : 0
+  name                         = local.web_container_app_name
+  resource_group_name          = azurerm_resource_group.this.name
+  container_app_environment_id = azurerm_container_app_environment.this.id
+  revision_mode                = "Single"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.this.id]
+  }
+
+  registry {
+    server   = azurerm_container_registry.this.login_server
+    identity = azurerm_user_assigned_identity.this.id
+  }
+
+  secret {
+    name                = "clinicflow-api-base-url"
+    key_vault_secret_id = azurerm_key_vault_secret.clinicflow_api_base_url[0].versionless_id
+    identity            = azurerm_user_assigned_identity.this.id
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8080
+    transport        = "auto"
+
+    traffic_weight {
+      percentage      = 100
+      latest_revision = true
+    }
+  }
+
+  template {
+    min_replicas = 0
+    max_replicas = 1
+
+    container {
+      name   = "web"
+      image  = var.web_image
       cpu    = 0.25
       memory = "0.5Gi"
 

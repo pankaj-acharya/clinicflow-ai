@@ -35,6 +35,10 @@ output "gateway_url" {
   value = try("https://${azurerm_container_app.gateway[0].ingress[0].fqdn}", null)
 }
 
+output "web_url" {
+  value = try("https://${azurerm_container_app.web[0].ingress[0].fqdn}", null)
+}
+
 output "managed_identity_client_id" {
   value = azurerm_user_assigned_identity.this.client_id
 }
