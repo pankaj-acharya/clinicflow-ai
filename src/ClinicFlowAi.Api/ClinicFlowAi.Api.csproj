@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClinicFlowAi.Domain\ClinicFlowAi.Domain.csproj" />
+    <ProjectReference Include="..\ClinicFlowAi.Infrastructure.Postgres\ClinicFlowAi.Infrastructure.Postgres.csproj" />
   </ItemGroup>
 </Project>
 

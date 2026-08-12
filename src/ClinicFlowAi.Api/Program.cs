@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using ClinicFlowAi.Domain;
 using ClinicFlowAi.Api;
+using ClinicFlowAi.Infrastructure.Postgres;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +12,18 @@ builder.Services.AddHttpClient("AgentGateway", client =>
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
+// Wire Postgres persistence when a connection string is present; otherwise the
+// API runs in in-memory mode (development default with no DB configured).
+var pgConnection = builder.Configuration.GetConnectionString("ClinicFlowDb");
+var postgresEnabled = !string.IsNullOrWhiteSpace(pgConnection);
+if (postgresEnabled)
+    builder.Services.AddPostgresInfrastructure(pgConnection!);
+
 var app = builder.Build();
+
+// Migrate and seed development data when Postgres is enabled.
+if (postgresEnabled && app.Environment.IsDevelopment())
+    await app.MigrateAndSeedAsync();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
