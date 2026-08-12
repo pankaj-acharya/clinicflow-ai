@@ -13,14 +13,6 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "infra/**"
-      - "foundry/**"
-      - ".github/workflows/dev-deploy.yml"
 
 env:
   TF_IN_AUTOMATION: true
@@ -40,8 +32,8 @@ env:
 
 jobs:
   deploy-infrastructure-and-apps:
-    # Skip deployment if any destruction is requested
-    if: ${{ github.event_name == 'push' || (!inputs.destroy_resources && !inputs.destroy_foundry_agents) }}
+    # Run only for manual dispatch when no destruction mode is selected
+    if: ${{ !inputs.destroy_resources && !inputs.destroy_foundry_agents }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -146,8 +138,8 @@ jobs:
         run: terraform output
 
   deploy-foundry-agent:
-    # Skip Foundry deployment if any destruction is requested
-    if: ${{ github.event_name == 'push' || (!inputs.destroy_resources && !inputs.destroy_foundry_agents) }}
+    # Run only for manual dispatch when no destruction mode is selected
+    if: ${{ !inputs.destroy_resources && !inputs.destroy_foundry_agents }}
     runs-on: ubuntu-latest
     needs: deploy-infrastructure-and-apps
     permissions:
