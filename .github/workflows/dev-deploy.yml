@@ -51,6 +51,52 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Grant service principal RBAC permissions
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+          PRINCIPAL_OBJECT_ID=$(az ad sp show --id "$AZURE_CLIENT_ID" --query id -o tsv)
+          
+          echo "📋 Configuring RBAC for deployment principal"
+          echo "   Principal Object ID: $PRINCIPAL_OBJECT_ID"
+          echo "   Subscription: $SUBSCRIPTION_ID"
+          
+          # Check and grant User Access Administrator
+          if az role assignment list \
+               --assignee "$PRINCIPAL_OBJECT_ID" \
+               --scope "/subscriptions/$SUBSCRIPTION_ID" \
+               --query "[?roleDefinitionName=='User Access Administrator'].id" \
+               -o tsv | grep -q .; then
+            echo "✅ User Access Administrator role already assigned"
+          else
+            echo "⏳ Granting User Access Administrator role..."
+            az role assignment create \
+              --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+              --role "User Access Administrator" \
+              --scope "/subscriptions/$SUBSCRIPTION_ID" \
+              --assignee-principal-type ServicePrincipal
+            echo "✅ User Access Administrator role granted"
+          fi
+          
+          # Check and grant Contributor
+          if az role assignment list \
+               --assignee "$PRINCIPAL_OBJECT_ID" \
+               --scope "/subscriptions/$SUBSCRIPTION_ID" \
+               --query "[?roleDefinitionName=='Contributor'].id" \
+               -o tsv | grep -q .; then
+            echo "✅ Contributor role already assigned"
+          else
+            echo "⏳ Granting Contributor role..."
+            az role assignment create \
+              --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+              --role "Contributor" \
+              --scope "/subscriptions/$SUBSCRIPTION_ID" \
+              --assignee-principal-type ServicePrincipal
+            echo "✅ Contributor role granted"
+          fi
+
       - name: Preflight bootstrap prerequisites
         shell: bash
         env:
@@ -114,7 +160,7 @@ jobs:
       - name: Build and push API image
         shell: bash
         run: |
-          ACR_LOGIN_SERVER=$(python -c "import json; from pathlib import Path; data=json.loads(Path('terraform-outputs.json').read_text(encoding='utf-8')); print(data['container_registry_login_server']['value'])")
+          ACR_LOGIN_SERVER=$(python -c "import json; from pathlib import Path; data=json.loads(Path('terraform-outputs.json').read_text(encoding='utf-8')); print(data['container_registry_login_se[...]
           docker build -f src/ClinicFlowAi.Api/Dockerfile -t "$API_IMAGE" -t "$ACR_LOGIN_SERVER/$API_IMAGE_NAME:${GITHUB_SHA}" .
           docker push "$API_IMAGE"
           docker push "$ACR_LOGIN_SERVER/$API_IMAGE_NAME:${GITHUB_SHA}"
@@ -122,7 +168,7 @@ jobs:
       - name: Build and push Agent Gateway image
         shell: bash
         run: |
-          ACR_LOGIN_SERVER=$(python -c "import json; from pathlib import Path; data=json.loads(Path('terraform-outputs.json').read_text(encoding='utf-8')); print(data['container_registry_login_server']['value'])")
+          ACR_LOGIN_SERVER=$(python -c "import json; from pathlib import Path; data=json.loads(Path('terraform-outputs.json').read_text(encoding='utf-8')); print(data['container_registry_login_se[...]
           docker build -f src/ClinicFlowAi.AgentGateway/Dockerfile -t "$GATEWAY_IMAGE" -t "$ACR_LOGIN_SERVER/$GATEWAY_IMAGE_NAME:${GITHUB_SHA}" .
           docker push "$GATEWAY_IMAGE"
           docker push "$ACR_LOGIN_SERVER/$GATEWAY_IMAGE_NAME:${GITHUB_SHA}"
