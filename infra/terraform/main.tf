@@ -234,6 +234,15 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
   collation = "en_US.utf8"
 }
 
+resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure_services" {
+  count            = var.deploy_postgres ? 1 : 0
+  name             = "allow-azure-services"
+  server_id        = azurerm_postgresql_flexible_server.this[0].id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
+}
+
+
 resource "azurerm_key_vault_secret" "postgres_connection_string" {
   count        = (var.deploy_postgres && var.deploy_container_apps) ? 1 : 0
   name         = "clinicflow-postgres-connection-string"
