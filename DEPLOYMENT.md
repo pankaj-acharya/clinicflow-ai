@@ -36,6 +36,7 @@ The deployment pipeline (`dev-deploy.yml`) automatically:
 - Passes the password from the secret to Terraform
 - Creates the database with migrations applied
 - Seeds development data (in development environment)
+- Validates that `FOUNDRY_MODEL_DEPLOYMENT_NAME` already exists under `FOUNDRY_PROJECT_ENDPOINT` before any Foundry deployment work begins
 
 ### Step 3: Application Configuration
 
@@ -53,6 +54,8 @@ The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
 3. **Foundry Agent** (Booking assistant deployment)
 4. **Cleanup** (Optional: destroys resources or just Foundry agents)
+
+The Foundry stage fails fast if the configured model deployment is missing and then runs a post-deploy smoke test that only checks the agent invocation succeeds.
 
 ### Triggering a Deployment
 
@@ -394,5 +397,4 @@ az keyvault secret set --vault-name clinicflowaidevkv \
 ```
 
 Agent still logs to Foundry portal; LAW stays clean. Re-enable after demo.
-
 

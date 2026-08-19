@@ -197,7 +197,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install azure-identity azure-ai-projects httpx pyyaml azure-monitor-opentelemetry
+          python -m pip install azure-identity azure-ai-projects openai httpx pyyaml azure-monitor-opentelemetry
 
       - name: Preflight Foundry prerequisites
         shell: bash
@@ -206,6 +206,9 @@ jobs:
           FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
           FOUNDRY_MODEL_DEPLOYMENT_NAME: ${{ secrets.FOUNDRY_MODEL_DEPLOYMENT_NAME }}
         run: |
+          echo "=================================================="
+          echo "=== Foundry deployment validation (fail-fast) ==="
+          echo "=================================================="
           python infra/scripts/preflight_deploy.py --mode foundry
 
       - name: Retrieve AppInsights configuration from Key Vault
@@ -230,6 +233,17 @@ jobs:
           APPINSIGHTS_INSTRUMENTATION_KEY: ${{ env.APPINSIGHTS_INSTRUMENTATION_KEY }}
         run: |
           python foundry/scripts/deploy_prompt_agent.py
+
+      - name: Smoke test Foundry prompt agent deployment
+        shell: bash
+        env:
+          FOUNDRY_PROJECT_ENDPOINT: ${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}
+          FOUNDRY_AGENT_NAME: clinicflow-booking-assistant
+        run: |
+          echo "======================================="
+          echo "=== Foundry smoke test (success) ==="
+          echo "======================================="
+          python foundry/scripts/smoke_test_prompt_agent.py
 
       - name: Upload Foundry deployment metadata
         uses: actions/upload-artifact@v4

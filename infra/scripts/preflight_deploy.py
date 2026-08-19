@@ -6,6 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+
 
 REQUIRED_PROVIDERS = [
     "Microsoft.App",
@@ -123,6 +126,28 @@ def _output_value(outputs: dict[str, object], name: str) -> str:
     return str(value["value"])
 
 
+def _verify_foundry_model_deployment(project_endpoint: str, model_deployment_name: str) -> None:
+    try:
+        with DefaultAzureCredential() as credential, AIProjectClient(
+            endpoint=project_endpoint,
+            credential=credential,
+        ) as project_client:
+            project_client.deployments.get(name=model_deployment_name)
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        if status_code == 404:
+            raise PreflightError(
+                "Foundry model deployment "
+                f"'{model_deployment_name}' was not found under {project_endpoint}. "
+                "Create that model deployment in Foundry first, then rerun this workflow."
+            ) from exc
+
+        raise PreflightError(
+            "Unable to verify Foundry model deployment "
+            f"'{model_deployment_name}' under {project_endpoint}: {exc}"
+        ) from exc
+
+
 def _role_assignments(scope: str) -> list[dict[str, object]]:
     assignments = _az(
         ["role", "assignment", "list", "--scope", scope, "-o", "json"],
@@ -235,10 +260,14 @@ def _foundry_mode() -> None:
     if not model_deployment_name:
         raise PreflightError("Missing required environment variable: FOUNDRY_MODEL_DEPLOYMENT_NAME")
 
+    print("=== Foundry deployment validation ===")
+    _verify_foundry_model_deployment(project_endpoint, model_deployment_name)
+
     summary_lines = [
         "## Foundry deployment preflight",
         f"- Foundry project endpoint: `{project_endpoint}`",
         f"- Model deployment: `{model_deployment_name}`",
+        "- Model deployment validation: found and ready",
         f"- Deployment principal: `{principal['display_name']}` ({principal['kind']})",
         f"- Deployment principal object id: `{principal['object_id']}`",
         "- Required bootstrap permission: write-capable Foundry / Azure AI access at the target project or parent resource scope.",
@@ -263,7 +292,7 @@ def main() -> None:
         else:
             _foundry_mode()
     except PreflightError as exc:
-        print(f"❌ {exc}", file=sys.stderr)
+        print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
 
 
