@@ -49,7 +49,7 @@ The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github
 4. Verifies the ACR role assignments before any image build or push work starts.
 5. Builds and pushes API and gateway images.
 6. Applies the application layer with those image tags.
-7. Validates Foundry prerequisites, confirms the configured `FOUNDRY_MODEL_DEPLOYMENT_NAME` exists in the target `FOUNDRY_PROJECT_ENDPOINT`, deploys a prompt agent version using the assets under [foundry/](foundry/), and runs a smoke test that only checks the agent call succeeds.
+7. Provisions the Foundry project in Terraform, validates Foundry prerequisites, confirms the configured `FOUNDRY_MODEL_DEPLOYMENT_NAME` exists in the Terraform-managed `FOUNDRY_PROJECT_ENDPOINT`, deploys a prompt agent version using the assets under [foundry/](foundry/), and runs a smoke test that only checks the agent call succeeds.
 
 ### Azure bootstrap boundary
 

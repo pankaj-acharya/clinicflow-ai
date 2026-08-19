@@ -11,12 +11,15 @@ The CI pipeline validates this manifest, fails fast if the configured model depl
 
 Before the first deployment run, the GitHub Actions deployment identity must already have write-capable access to the target Foundry / Azure AI project scope, such as `Contributor` or an equivalent tenant-specific Foundry author role. The workflow now validates the configured Foundry endpoint and model deployment before deployment and fails with explicit remediation if that bootstrap permission is missing.
 
+The Foundry project is created by Terraform in a dedicated resource group such as `clinicflow-ai-dev-foundry-rg`, and the workflow uses the Terraform-derived project endpoint.
+
 Required GitHub repository secrets for the Foundry deploy stage:
 
-- `FOUNDRY_PROJECT_ENDPOINT`
 - `FOUNDRY_MODEL_DEPLOYMENT_NAME` (must reference an existing deployment in the target project)
 - `FOUNDRY_AGENT_INSTRUCTIONS` (optional, can be empty)
 - `CLINICFLOW_API_BASE_URL` (optional)
 - `CLINICFLOW_GATEWAY_BASE_URL` (optional)
+
+The workflow derives the Foundry project endpoint from the same Terraform naming convention, so no manual endpoint secret is needed.
 
 After deployment, the workflow runs a smoke test that only checks the agent call succeeds.
