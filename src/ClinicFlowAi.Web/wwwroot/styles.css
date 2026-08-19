@@ -234,6 +234,62 @@ textarea {
   box-shadow: none;
 }
 
+.recent-prompts {
+  margin-bottom: 1.5rem;
+}
+
+.recent-prompts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.link-button {
+  background: transparent;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.prompt-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.prompt-chip,
+.prompt-empty {
+  border-radius: 9999px;
+  font-size: 0.85rem;
+}
+
+.prompt-chip {
+  border: 1px solid var(--border-color);
+  background: #fff;
+  color: var(--text-primary);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prompt-chip:hover {
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.prompt-empty {
+  color: var(--text-secondary);
+  background: var(--bg-light);
+  padding: 0.45rem 0.75rem;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
