@@ -40,6 +40,14 @@
               placeholder="Examples:&#10;• Show me next available dentist appointment&#10;• Next appointment with Hygienist Mrs Smith, preferably Monday morning&#10;• Find 5 available appointments with any dentist"
               rows="4"></textarea>
           </div>
+
+          <div class="recent-prompts">
+            <div class="recent-prompts-header">
+              <span>Recent prompts</span>
+              <button id="clearPromptHistory" type="button" class="link-button">Clear</button>
+            </div>
+            <div id="recentPromptList" class="prompt-chip-list" aria-label="Recent prompts"></div>
+          </div>
           
           <button id="askBtn" class="btn btn-primary btn-lg">
             <span class="btn-icon">✨</span> Ask AI
