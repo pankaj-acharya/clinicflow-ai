@@ -8,6 +8,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+
 
 REQUIRED_PROVIDERS = [
     "Microsoft.App",
@@ -134,6 +137,33 @@ def _load_foundry_sdk() -> tuple[object, object, type[BaseException], type[BaseE
     return AIProjectClient, DeploymentType, ClientAuthenticationError, HttpResponseError, ResourceNotFoundError, DefaultAzureCredential
 
 
+def _is_ready_foundry_deployment(deployment: object) -> bool:
+    ready_states = {"ready", "succeeded", "success", "active", "healthy", "online"}
+    not_ready_states = {"creating", "provisioning", "updating", "pending", "starting", "deploying", "failed", "error", "cancelled", "canceled"}
+
+    candidates = [
+        getattr(deployment, "status", None),
+        getattr(deployment, "state", None),
+        getattr(getattr(deployment, "properties", None), "status", None),
+        getattr(getattr(deployment, "properties", None), "provisioning_state", None),
+        getattr(getattr(deployment, "properties", None), "provisioningState", None),
+    ]
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        normalized = str(candidate).strip().lower()
+        if not normalized:
+            continue
+        if normalized in ready_states:
+            return True
+        if normalized in not_ready_states:
+            return False
+
+    return False
+
+
 def _validate_foundry_model_deployment(project_endpoint: str, model_deployment_name: str) -> object:
     AIProjectClient, DeploymentType, ClientAuthenticationError, HttpResponseError, ResourceNotFoundError, DefaultAzureCredential = _load_foundry_sdk()
 
@@ -169,8 +199,13 @@ def _validate_foundry_model_deployment(project_endpoint: str, model_deployment_n
             f"Foundry resource '{model_deployment_name}' at {project_endpoint} exists but is not a model deployment."
         )
 
-    return deployment
+    if not _is_ready_foundry_deployment(deployment):
+        raise PreflightError(
+            f"Foundry model deployment '{model_deployment_name}' exists at {project_endpoint}, but it is not ready. "
+            "Wait for the deployment to finish provisioning or update FOUNDRY_MODEL_DEPLOYMENT_NAME to a ready model deployment."
+        )
 
+    return deployment
 
 def _role_assignments(scope: str) -> list[dict[str, object]]:
     assignments = _az(
@@ -290,6 +325,7 @@ def _foundry_mode() -> None:
         f"- Foundry project endpoint: `{project_endpoint}`",
         f"- Model deployment: `{model_deployment_name}`",
         f"- Validation: found existing `{str(getattr(deployment, 'type', 'unknown'))}` deployment",
+        f"- Model deployment validation: ready={str(_is_ready_foundry_deployment(deployment)).lower()}",
         f"- Deployment principal: `{principal['display_name']}` ({principal['kind']})",
         f"- Deployment principal object id: `{principal['object_id']}`",
         "- Required bootstrap permission: write-capable Foundry / Azure AI access at the target project or parent resource scope.",
@@ -314,7 +350,7 @@ def main() -> None:
         else:
             _foundry_mode()
     except PreflightError as exc:
-        print(f"❌ {exc}", file=sys.stderr)
+        print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
 
 
