@@ -126,13 +126,40 @@ def _output_value(outputs: dict[str, object], name: str) -> str:
     return str(value["value"])
 
 
+def _is_ready_foundry_deployment(deployment: object) -> bool:
+    ready_states = {"ready", "succeeded", "success", "active", "healthy", "online"}
+    not_ready_states = {"creating", "provisioning", "updating", "pending", "starting", "deploying", "failed", "error", "cancelled", "canceled"}
+
+    candidates = [
+        getattr(deployment, "status", None),
+        getattr(deployment, "state", None),
+        getattr(getattr(deployment, "properties", None), "status", None),
+        getattr(getattr(deployment, "properties", None), "provisioning_state", None),
+        getattr(getattr(deployment, "properties", None), "provisioningState", None),
+    ]
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        normalized = str(candidate).strip().lower()
+        if not normalized:
+            continue
+        if normalized in ready_states:
+            return True
+        if normalized in not_ready_states:
+            return False
+
+    return False
+
+
 def _verify_foundry_model_deployment(project_endpoint: str, model_deployment_name: str) -> None:
     try:
         with DefaultAzureCredential() as credential, AIProjectClient(
             endpoint=project_endpoint,
             credential=credential,
         ) as project_client:
-            project_client.deployments.get(name=model_deployment_name)
+            deployment = project_client.deployments.get(name=model_deployment_name)
     except Exception as exc:
         status_code = getattr(exc, "status_code", None)
         if status_code == 404:
@@ -146,6 +173,13 @@ def _verify_foundry_model_deployment(project_endpoint: str, model_deployment_nam
             "Unable to verify Foundry model deployment "
             f"'{model_deployment_name}' under {project_endpoint}: {exc}"
         ) from exc
+
+    if not _is_ready_foundry_deployment(deployment):
+        raise PreflightError(
+            "Foundry model deployment "
+            f"'{model_deployment_name}' exists under {project_endpoint}, but it is not ready. "
+            "Wait for the deployment to finish provisioning or update the deployment name to a ready model deployment."
+        )
 
 
 def _role_assignments(scope: str) -> list[dict[str, object]]:

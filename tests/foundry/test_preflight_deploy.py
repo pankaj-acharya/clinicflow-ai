@@ -52,6 +52,14 @@ class FakeCredential:
         return False
 
 
+class FakeReadyDeployment:
+    status = "Succeeded"
+
+
+class FakeUnreadyDeployment:
+    status = "Provisioning"
+
+
 class PreflightFoundryValidationTests(unittest.TestCase):
     def setUp(self):
         self.module = load_module()
@@ -62,14 +70,24 @@ class PreflightFoundryValidationTests(unittest.TestCase):
         self.module.DefaultAzureCredential = self.original_credential
         self.module.AIProjectClient = self.original_client
 
-    def test_verify_foundry_model_deployment_succeeds_when_present(self):
-        deployments = FakeDeployments(result=object())
+    def test_verify_foundry_model_deployment_succeeds_when_present_and_ready(self):
+        deployments = FakeDeployments(result=FakeReadyDeployment())
         self.module.DefaultAzureCredential = lambda: FakeCredential()
         self.module.AIProjectClient = lambda **kwargs: FakeProjectClient(deployments)
 
         self.module._verify_foundry_model_deployment("https://example", "demo-model")
 
         self.assertEqual(deployments.requested_name, "demo-model")
+
+    def test_verify_foundry_model_deployment_fails_when_not_ready(self):
+        deployments = FakeDeployments(result=FakeUnreadyDeployment())
+        self.module.DefaultAzureCredential = lambda: FakeCredential()
+        self.module.AIProjectClient = lambda **kwargs: FakeProjectClient(deployments)
+
+        with self.assertRaises(self.module.PreflightError) as ctx:
+            self.module._verify_foundry_model_deployment("https://example", "demo-model")
+
+        self.assertIn("not ready", str(ctx.exception).lower())
 
     def test_verify_foundry_model_deployment_fails_fast_when_missing(self):
         deployments = FakeDeployments(error=FakeDeploymentError(404, "missing"))
