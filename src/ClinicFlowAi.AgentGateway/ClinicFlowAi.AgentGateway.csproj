@@ -5,5 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
-</Project>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ClinicFlowAi.Domain\ClinicFlowAi.Domain.csproj" />
+  </ItemGroup>
+</Project>

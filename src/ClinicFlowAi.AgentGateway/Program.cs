@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using ClinicFlowAi.AgentGateway;
+using ClinicFlowAi.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -142,12 +143,24 @@ app.MapPost("/agents/booking/ask", async (AgentNlSchedulingRequest request, ICon
 
     // Normalise MaxResults: 0 → 1, >10 → 10 (silent, no rejection)
     var count = request.MaxResults < 1 ? 1 : Math.Clamp(request.MaxResults, 1, 10);
+    var inferredClinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt);
+    var inferredClinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt);
+    var inferredPreferredTimeOfDay = PromptSchedulingInference.InferPreferredTimeOfDay(request.Prompt, request.PreferredTimeOfDay);
 
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",
-        request.ClinicianRole, count);
+        inferredClinicianRole, count);
 
-    var response = await InvokeFoundryOrFallbackAsync(request with { MaxResults = count }, configuration, cancellationToken);
+    var response = await InvokeFoundryOrFallbackAsync(
+        request with
+        {
+            ClinicianName = inferredClinicianName,
+            ClinicianRole = inferredClinicianRole,
+            PreferredTimeOfDay = inferredPreferredTimeOfDay,
+            MaxResults = count
+        },
+        configuration,
+        cancellationToken);
     return Results.Ok(response);
 });
 app.MapPost("/agents/faq/answer", (AgentFaqQuery query) => Results.Ok(new { answer = "Use approved knowledge base only.", query.Question }));
@@ -177,15 +190,14 @@ static async Task<AgentNlSchedulingResponse> InvokeFoundryOrFallbackAsync(
 
 static AgentNlSchedulingResponse GenerateFallbackResponse(AgentNlSchedulingRequest request)
 {
-	var clinicianId = request.ClinicianName is not null
-		? request.ClinicianName.Replace(" ", "").ToLowerInvariant()
-		: "clinician-1";
-	var clinicianName = request.ClinicianName ?? "Dr. Default";
-	var clinicianRole = request.ClinicianRole ?? "General Practitioner";
+	var clinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt) ?? "Dr Default";
+	var clinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt) ?? "General Practitioner";
+	var clinicianId = clinicianName.Replace(" ", "").ToLowerInvariant();
+	var earliestStartTime = PromptSchedulingInference.InferEarliestStartTime(request.Prompt, request.PreferredTimeOfDay) ?? new TimeOnly(9, 0);
 
 	var slots = new List<AgentNlSlotOption>(request.MaxResults);
 	var baseDate = DateTimeOffset.UtcNow.Date.AddDays(1);
-	var cursor = new DateTimeOffset(baseDate, TimeSpan.Zero).AddHours(9);
+	var cursor = new DateTimeOffset(baseDate, TimeSpan.Zero).Add(earliestStartTime.ToTimeSpan());
 
 	for (int i = 0; i < request.MaxResults; i++)
 	{
@@ -203,7 +215,7 @@ static AgentNlSchedulingResponse GenerateFallbackResponse(AgentNlSchedulingReque
 	}
 
 	return new AgentNlSchedulingResponse(
-		InterpretedIntent: $"Schedule with {clinicianRole}",
+		InterpretedIntent: $"Schedule with {clinicianRole}{(request.PreferredTimeOfDay is null ? "" : $" in the {request.PreferredTimeOfDay}")}",
 		Slots: slots,
 		Message: slots.Count == 0 ? "No slots found matching your criteria" : null);
 }
