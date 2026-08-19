@@ -66,3 +66,7 @@ output "foundry_project_name" {
 output "foundry_project_endpoint" {
   value = "https://${azapi_resource.foundry_account.name}.services.ai.azure.com/api/projects/${azapi_resource.foundry_project.name}"
 }
+
+output "foundry_model_deployment_name" {
+  value = azapi_resource.foundry_model_deployment.name
+}

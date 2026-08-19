@@ -1,7 +1,10 @@
 locals {
-  foundry_resource_group_name = "${local.project_name}-${var.environment}-foundry-rg"
-  foundry_account_name        = lower(replace("${local.project_name}${var.environment}foundry", "-", ""))
-  foundry_project_name        = "${local.project_name}-${var.environment}-foundry"
+  foundry_resource_group_name   = "${local.project_name}-${var.environment}-foundry-rg"
+  foundry_account_name          = lower(replace("${local.project_name}${var.environment}foundry", "-", ""))
+  foundry_project_name          = "${local.project_name}-${var.environment}-foundry"
+  foundry_model_deployment_name = "${local.project_name}-${var.environment}-model"
+  foundry_model_name            = "gpt-4.1-mini"
+  foundry_model_version         = "2025-04-14"
 }
 
 resource "azurerm_resource_group" "foundry" {
@@ -49,9 +52,42 @@ resource "azapi_resource" "foundry_project" {
   }
 
   body = {
+    sku = {
+      name = "S0"
+    }
     properties = {
       displayName = "ClinicFlow AI ${var.environment} Foundry"
       description = "ClinicFlow AI ${var.environment} Foundry project"
+    }
+  }
+
+  schema_validation_enabled = false
+  response_export_values    = ["*"]
+}
+
+resource "azapi_resource" "foundry_model_deployment" {
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = local.foundry_model_deployment_name
+  parent_id = azapi_resource.foundry_account.id
+  location  = var.region
+
+  depends_on = [
+    azapi_resource.foundry_project,
+  ]
+
+  body = {
+    sku = {
+      name     = "Standard"
+      capacity = 1
+    }
+    properties = {
+      model = {
+        format  = "OpenAI"
+        name    = local.foundry_model_name
+        version = local.foundry_model_version
+      }
+      versionUpgradeOption = "OnceNewDefaultVersionAvailable"
+      raiPolicyName        = "Microsoft.DefaultV2"
     }
   }
 

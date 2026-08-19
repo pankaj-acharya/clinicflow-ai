@@ -10,7 +10,6 @@ This document explains how to deploy ClinicFlow AI to Azure.
   - `AZURE_CLIENT_ID`
   - `AZURE_TENANT_ID`
   - `AZURE_SUBSCRIPTION_ID`
-  - `FOUNDRY_MODEL_DEPLOYMENT_NAME` (must already exist in the target Foundry project)
   - `FOUNDRY_AGENT_INSTRUCTIONS`
   - `CLINICFLOW_API_BASE_URL`
   - `CLINICFLOW_GATEWAY_BASE_URL`
@@ -19,6 +18,7 @@ The Foundry project is now created by Terraform using deterministic names:
 - Foundry resource group: `clinicflow-ai-<env>-foundry-rg`
 - Foundry account: `clinicflowai<env>foundry`
 - Foundry project: `clinicflow-ai-<env>-foundry`
+- Foundry model deployment: `clinicflow-ai-<env>-model`
 - Project endpoint: `https://clinicflowai<env>foundry.services.ai.azure.com/api/projects/clinicflow-ai-<env>-foundry`
 
 ## PostgreSQL Setup for Development
@@ -42,7 +42,8 @@ The deployment pipeline (`dev-deploy.yml`) automatically:
 - Creates the database with migrations applied
 - Seeds development data (in development environment)
 - Provisions the Foundry account and project in Terraform
-- Validates that `FOUNDRY_MODEL_DEPLOYMENT_NAME` already exists under the Terraform-managed Foundry endpoint before any Foundry deployment work begins
+- Provisions the Foundry model deployment in Terraform
+- Validates the Terraform-managed Foundry model deployment before any Foundry deployment work begins
 
 ### Step 3: Application Configuration
 
@@ -60,7 +61,7 @@ The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 
 1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, etc.)
 2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
-3. **Foundry Preflight** (validates `FOUNDRY_MODEL_DEPLOYMENT_NAME` against the Terraform-managed Foundry project endpoint)
+3. **Foundry Preflight** (validates the Terraform-managed Foundry model deployment against the Terraform-managed Foundry project endpoint)
 4. **Foundry Agent** (Booking assistant deployment plus a minimal smoke test)
 5. **Cleanup** (Optional: destroys resources or just Foundry agents)
 
@@ -72,7 +73,7 @@ The Foundry stage fails fast if the configured model deployment is missing and t
 2. Click **Run workflow**
 3. Choose options:
    - `destroy_resources`: Set to `true` to delete all cloud resources (use to avoid costs)
-   - `destroy_foundry_agents`: Set to `true` to delete only agents/models
+   - `destroy_foundry_agents`: Set to `true` to delete only agents
 
 ## Live Endpoints (dev environment)
 

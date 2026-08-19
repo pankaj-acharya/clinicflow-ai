@@ -27,6 +27,7 @@ env:
   TF_STATE_KEY: clinicflow-ai.dev.tfstate
   # Derived from the Terraform naming convention for the Foundry account/project.
   FOUNDRY_PROJECT_ENDPOINT: https://clinicflowaidevfoundry.services.ai.azure.com/api/projects/clinicflow-ai-dev-foundry
+  FOUNDRY_MODEL_DEPLOYMENT_NAME: clinicflow-ai-dev-model
   IMAGE_TAG: ${{ github.sha }}
   API_IMAGE: clinicflowaidev.azurecr.io/clinicflow-ai-api:${{ github.sha }}
   GATEWAY_IMAGE: clinicflowaidev.azurecr.io/clinicflow-ai-gateway:${{ github.sha }}
@@ -205,7 +206,6 @@ jobs:
         shell: bash
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          FOUNDRY_MODEL_DEPLOYMENT_NAME: ${{ secrets.FOUNDRY_MODEL_DEPLOYMENT_NAME }}
         run: |
           echo "=================================================="
           echo "=== Foundry deployment validation (fail-fast) ==="
@@ -224,7 +224,6 @@ jobs:
       - name: Deploy Foundry prompt agent version
         shell: bash
         env:
-          FOUNDRY_MODEL_DEPLOYMENT_NAME: ${{ secrets.FOUNDRY_MODEL_DEPLOYMENT_NAME }}
           FOUNDRY_AGENT_NAME: clinicflow-booking-assistant
           FOUNDRY_AGENT_INSTRUCTIONS: ${{ secrets.FOUNDRY_AGENT_INSTRUCTIONS }}
           CLINICFLOW_API_BASE_URL: ${{ secrets.CLINICFLOW_API_BASE_URL }}
@@ -279,7 +278,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install azure-identity azure-ai-projects pyyaml
 
-      - name: Delete Foundry agents and models
+      - name: Delete Foundry agents
         shell: bash
         env:
           FOUNDRY_AGENT_NAME: clinicflow-booking-assistant
@@ -291,7 +290,7 @@ jobs:
         run: |
           echo "✅ Foundry cleanup complete"
           echo "All agent versions for 'clinicflow-booking-assistant' have been removed."
-          echo "Note: Foundry project, AI resources, and model deployments were preserved."
+          echo "Note: Foundry project, AI resources, and Terraform-managed model deployments were preserved."
 
   cleanup-resources:
     # Only run if destruction is explicitly requested via workflow_dispatch
