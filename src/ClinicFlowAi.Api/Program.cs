@@ -121,7 +121,11 @@ app.MapPost("/bookings", async (BookingRequestDto request, [FromServices] IAppoi
     return Results.Ok(result);
 });
 
-app.MapPost("/ask", async (NlSchedulingRequest request, [FromServices] IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
+app.MapPost("/ask", async (
+    NlSchedulingRequest request,
+    [FromServices] IHttpClientFactory httpClientFactory,
+    [FromServices] IAppointmentRepository? repo,
+    CancellationToken cancellationToken) =>
 {
     // --- Input validation ---
     if (string.IsNullOrWhiteSpace(request.Prompt))
@@ -154,22 +158,38 @@ app.MapPost("/ask", async (NlSchedulingRequest request, [FromServices] IHttpClie
         ?.Where(d => !string.IsNullOrWhiteSpace(d) && validDayNames.Contains(d.Trim().ToLowerInvariant()))
         .ToArray();
 
-    var inferredClinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt);
-    var inferredClinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt);
-    var inferredPreferredTimeOfDay = PromptSchedulingInference.InferPreferredTimeOfDay(request.Prompt, request.PreferredTimeOfDay);
+    var filters = PromptSchedulingInference.InferFilters(
+        request.Prompt,
+        request.ClinicianName,
+        request.ClinicianRole,
+        request.PreferredTimeOfDay,
+        filteredDays);
 
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",
-        inferredClinicianRole, count);
+        filters.ClinicianRole, count);
 
     var normalised = request with
     {
-        ClinicianName = inferredClinicianName,
-        ClinicianRole = inferredClinicianRole,
+        ClinicianName = filters.ClinicianName,
+        ClinicianRole = filters.ClinicianRole,
         PreferredDays = filteredDays,
-        PreferredTimeOfDay = inferredPreferredTimeOfDay,
+        PreferredTimeOfDay = filters.PreferredTimeOfDay,
         MaxResults = count
     };
+
+    if (repo is not null)
+    {
+        try
+        {
+            var sqlResponse = await BuildSqlBackedSchedulingResponseAsync(repo, filters, count, cancellationToken);
+            return Results.Ok(sqlResponse);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "SQL-backed ask AI lookup failed, falling back to gateway");
+        }
+    }
 
     try
     {
@@ -230,10 +250,17 @@ static string GenerateSlotId(string clinicianId, DateTimeOffset startsAtUtc)
 
 static IReadOnlyList<AvailableSlotOption> GenerateStubSlots(NlSchedulingRequest request, int count)
 {
-    var clinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt) ?? "Dr Default";
-    var clinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt) ?? "General Practitioner";
+    var filters = PromptSchedulingInference.InferFilters(
+        request.Prompt,
+        request.ClinicianName,
+        request.ClinicianRole,
+        request.PreferredTimeOfDay,
+        request.PreferredDays);
+
+    var clinicianName = filters.ClinicianName ?? "Dr Default";
+    var clinicianRole = filters.ClinicianRole ?? "General Practitioner";
     var clinicianId = clinicianName.Replace(" ", "").ToLowerInvariant();
-    var earliestStartTime = PromptSchedulingInference.InferEarliestStartTime(request.Prompt, request.PreferredTimeOfDay) ?? new TimeOnly(9, 0);
+    var earliestStartTime = filters.EarliestStartTime ?? new TimeOnly(9, 0);
 
     var slots = new List<AvailableSlotOption>(count);
     // Start from tomorrow at the earliest time implied by the prompt if any.
@@ -257,6 +284,127 @@ static IReadOnlyList<AvailableSlotOption> GenerateStubSlots(NlSchedulingRequest 
 
     return slots;
 }
+
+static async Task<NlSchedulingResponse> BuildSqlBackedSchedulingResponseAsync(
+    IAppointmentRepository repo,
+    PromptSchedulingFilters filters,
+    int count,
+    CancellationToken cancellationToken)
+{
+    const string clinicId = "clinic-1";
+
+    var windowStart = filters.PreferredDates.Count > 0
+        ? StartOfDayUtc(filters.PreferredDates.Min())
+        : StartOfDayUtc(DateOnly.FromDateTime(DateTime.UtcNow));
+    var windowEnd = filters.PreferredDates.Count > 0
+        ? EndExclusiveUtc(filters.PreferredDates.Max().AddDays(1))
+        : StartOfDayUtc(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(15));
+
+    var slots = await repo.GetAvailableSlotsAsync(
+        clinicId,
+        null,
+        filters.ClinicianRole,
+        windowStart,
+        windowEnd,
+        cancellationToken);
+
+    var filteredSlots = slots
+        .Where(slot => MatchesSchedulingFilters(slot, filters))
+        .OrderBy(slot => slot.StartsAtUtc)
+        .Take(count)
+        .Select(slot => new AvailableSlotOption(
+            SlotId: slot.Id,
+            ClinicianId: slot.ClinicianId,
+            ClinicianName: slot.Clinician.Name,
+            ClinicianRole: slot.Clinician.Role,
+            StartsAtUtc: slot.StartsAtUtc,
+            EndsAtUtc: slot.EndsAtUtc,
+            DisplayLabel: $"{slot.StartsAtUtc:dddd d MMM, HH:mm} \u2013 {slot.EndsAtUtc:HH:mm}"))
+        .ToList();
+
+    return new NlSchedulingResponse(
+        InterpretedIntent: BuildInterpretedIntent(filters),
+        Slots: filteredSlots,
+        Message: filteredSlots.Count == 0 ? "No slots found matching your criteria" : null);
+}
+
+static bool MatchesSchedulingFilters(AppointmentSlotEntity slot, PromptSchedulingFilters filters)
+{
+    if (filters.ClinicianName is not null && !NameMatches(slot.Clinician.Name, filters.ClinicianName))
+    {
+        return false;
+    }
+
+    if (filters.PreferredDates.Count > 0)
+    {
+        var slotDate = DateOnly.FromDateTime(slot.StartsAtUtc.UtcDateTime);
+        if (!filters.PreferredDates.Contains(slotDate))
+        {
+            return false;
+        }
+    }
+    else if (filters.PreferredWeekdays.Count > 0)
+    {
+        var slotDay = slot.StartsAtUtc.UtcDateTime.DayOfWeek;
+        if (!filters.PreferredWeekdays.Contains(slotDay))
+        {
+            return false;
+        }
+    }
+
+    if (filters.EarliestStartTime is not null)
+    {
+        var slotTime = TimeOnly.FromDateTime(slot.StartsAtUtc.UtcDateTime);
+        if (slotTime < filters.EarliestStartTime.Value)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool NameMatches(string candidate, string expected)
+{
+    string Normalize(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    return Normalize(candidate).Contains(Normalize(expected), StringComparison.Ordinal);
+}
+
+static string BuildInterpretedIntent(PromptSchedulingFilters filters)
+{
+    var parts = new List<string>();
+    if (filters.ClinicianRole is not null)
+    {
+        parts.Add(filters.ClinicianRole);
+    }
+
+    if (filters.ClinicianName is not null)
+    {
+        parts.Add(filters.ClinicianName);
+    }
+
+    if (filters.PreferredDates.Count > 0)
+    {
+        parts.Add(string.Join(", ", filters.PreferredDates.OrderBy(date => date).Select(date => date.ToString("yyyy-MM-dd"))));
+    }
+    else if (filters.PreferredWeekdays.Count > 0)
+    {
+        parts.Add(string.Join(", ", filters.PreferredWeekdays.OrderBy(day => day).Select(day => day.ToString())));
+    }
+
+    if (filters.PreferredTimeOfDay is not null)
+    {
+        parts.Add(filters.PreferredTimeOfDay);
+    }
+
+    return parts.Count > 0 ? $"Schedule with {string.Join(" / ", parts)}" : "Schedule search";
+}
+
+static DateTimeOffset StartOfDayUtc(DateOnly date)
+    => new(date.Year, date.Month, date.Day, 0, 0, 0, TimeSpan.Zero);
+
+static DateTimeOffset EndExclusiveUtc(DateOnly date)
+    => new(date.Year, date.Month, date.Day, 0, 0, 0, TimeSpan.Zero);
 
 public partial class Program
 {
