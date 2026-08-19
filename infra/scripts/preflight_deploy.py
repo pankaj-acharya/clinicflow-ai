@@ -8,10 +8,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
-
-
 REQUIRED_PROVIDERS = [
     "Microsoft.App",
     "Microsoft.CognitiveServices",
