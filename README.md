@@ -41,7 +41,7 @@ The dev deployment target is Azure Container Apps with supporting infrastructure
 - API and Agent Gateway container apps, each with its own image and ingress endpoint.
 - Gateway-to-API wiring through `ClinicFlowApi:BaseUrl`, injected from Key Vault during deployment.
 
-The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github/workflows/dev-deploy.yml). It:
+The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github/workflows/dev-deploy.yml). It must be dispatched from `main` because the Azure workload identity federation is scoped to that branch. It:
 
 1. Validates bootstrap prerequisites, registers required Azure resource providers, and surfaces the deployment identity and target scopes.
 2. Boots Terraform state storage.

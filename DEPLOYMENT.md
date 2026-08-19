@@ -50,6 +50,8 @@ The API automatically:
 
 The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 
+> Run it from `main`; feature-branch dispatches are intentionally skipped because the Azure workload identity federation is scoped to `main`.
+
 1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, etc.)
 2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
 3. **Foundry Preflight** (validates `FOUNDRY_MODEL_DEPLOYMENT_NAME` against `FOUNDRY_PROJECT_ENDPOINT`)
@@ -398,4 +400,3 @@ az keyvault secret set --vault-name clinicflowaidevkv \
 ```
 
 Agent still logs to Foundry portal; LAW stays clean. Re-enable after demo.
-
