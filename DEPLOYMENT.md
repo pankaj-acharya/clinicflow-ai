@@ -11,7 +11,7 @@ This document explains how to deploy ClinicFlow AI to Azure.
   - `AZURE_TENANT_ID`
   - `AZURE_SUBSCRIPTION_ID`
   - `FOUNDRY_PROJECT_ENDPOINT`
-  - `FOUNDRY_MODEL_DEPLOYMENT_NAME`
+  - `FOUNDRY_MODEL_DEPLOYMENT_NAME` (must already exist in the target Foundry project)
   - `FOUNDRY_AGENT_INSTRUCTIONS`
   - `CLINICFLOW_API_BASE_URL`
   - `CLINICFLOW_GATEWAY_BASE_URL`
@@ -51,8 +51,9 @@ The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 
 1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, etc.)
 2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
-3. **Foundry Agent** (Booking assistant deployment)
-4. **Cleanup** (Optional: destroys resources or just Foundry agents)
+3. **Foundry Preflight** (validates `FOUNDRY_MODEL_DEPLOYMENT_NAME` against `FOUNDRY_PROJECT_ENDPOINT`)
+4. **Foundry Agent** (Booking assistant deployment plus a minimal smoke test)
+5. **Cleanup** (Optional: destroys resources or just Foundry agents)
 
 ### Triggering a Deployment
 
@@ -394,5 +395,4 @@ az keyvault secret set --vault-name clinicflowaidevkv \
 ```
 
 Agent still logs to Foundry portal; LAW stays clean. Re-enable after demo.
-
 

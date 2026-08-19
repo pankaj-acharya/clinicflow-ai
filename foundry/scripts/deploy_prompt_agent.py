@@ -54,6 +54,23 @@ def _deployment_identity_hint() -> str:
     return "the current Azure deployment identity"
 
 
+def _run_smoke_test(project_client: AIProjectClient, model_deployment_name: str) -> str:
+    with project_client.get_openai_client() as openai_client:
+        response = openai_client.responses.create(
+            model=model_deployment_name,
+            input="Reply with OK.",
+            max_output_tokens=8,
+            temperature=0,
+        )
+
+    response_id = str(getattr(response, "id", "")).strip()
+    print(
+        f"Foundry smoke test passed for model deployment '{model_deployment_name}'"
+        + (f" (response id: {response_id})" if response_id else "")
+    )
+    return response_id
+
+
 def main() -> None:
     project_endpoint = _require_env("FOUNDRY_PROJECT_ENDPOINT")
     model_deployment_name = _require_env("FOUNDRY_MODEL_DEPLOYMENT_NAME")
@@ -91,6 +108,7 @@ def main() -> None:
                 agent_name=agent_name,
                 definition=definition,
             )
+            _run_smoke_test(project_client, model_deployment_name)
     except Exception as exc:
         raise RuntimeError(
             "Foundry deployment failed. "

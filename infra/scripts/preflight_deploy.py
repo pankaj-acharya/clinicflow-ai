@@ -6,6 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import DeploymentType
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
+from azure.identity import DefaultAzureCredential
+
 
 REQUIRED_PROVIDERS = [
     "Microsoft.App",
@@ -123,6 +128,42 @@ def _output_value(outputs: dict[str, object], name: str) -> str:
     return str(value["value"])
 
 
+def _validate_foundry_model_deployment(project_endpoint: str, model_deployment_name: str) -> object:
+    try:
+        with AIProjectClient(endpoint=project_endpoint, credential=DefaultAzureCredential()) as project_client:
+            deployment = project_client.deployments.get(model_deployment_name)
+    except ResourceNotFoundError as exc:
+        raise PreflightError(
+            f"Foundry model deployment '{model_deployment_name}' was not found at {project_endpoint}. "
+            "Create it first or update FOUNDRY_MODEL_DEPLOYMENT_NAME to an existing deployment."
+        ) from exc
+    except ClientAuthenticationError as exc:
+        raise PreflightError(
+            f"Unable to read Foundry model deployment '{model_deployment_name}' at {project_endpoint} because the "
+            "deployment identity cannot authenticate or lacks access. Grant write-capable Foundry / Azure AI access "
+            "and rerun the workflow."
+        ) from exc
+    except HttpResponseError as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", getattr(exc, "status_code", None))
+        if status_code in (401, 403):
+            raise PreflightError(
+                f"Unable to read Foundry model deployment '{model_deployment_name}' at {project_endpoint} because "
+                "the deployment identity cannot authenticate or lacks access. Grant write-capable Foundry / Azure AI "
+                "access and rerun the workflow."
+            ) from exc
+
+        raise PreflightError(
+            f"Unable to validate Foundry model deployment '{model_deployment_name}' at {project_endpoint}: {exc}"
+        ) from exc
+
+    if getattr(deployment, "type", None) != DeploymentType.MODEL_DEPLOYMENT:
+        raise PreflightError(
+            f"Foundry resource '{model_deployment_name}' at {project_endpoint} exists but is not a model deployment."
+        )
+
+    return deployment
+
+
 def _role_assignments(scope: str) -> list[dict[str, object]]:
     assignments = _az(
         ["role", "assignment", "list", "--scope", scope, "-o", "json"],
@@ -235,10 +276,12 @@ def _foundry_mode() -> None:
     if not model_deployment_name:
         raise PreflightError("Missing required environment variable: FOUNDRY_MODEL_DEPLOYMENT_NAME")
 
+    deployment = _validate_foundry_model_deployment(project_endpoint, model_deployment_name)
     summary_lines = [
         "## Foundry deployment preflight",
         f"- Foundry project endpoint: `{project_endpoint}`",
         f"- Model deployment: `{model_deployment_name}`",
+        f"- Validation: found existing `{str(getattr(deployment, 'type', 'unknown'))}` deployment",
         f"- Deployment principal: `{principal['display_name']}` ({principal['kind']})",
         f"- Deployment principal object id: `{principal['object_id']}`",
         "- Required bootstrap permission: write-capable Foundry / Azure AI access at the target project or parent resource scope.",
