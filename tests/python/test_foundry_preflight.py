@@ -20,6 +20,7 @@ def _load_module(relative_path: str, module_name: str):
 class FoundryPreflightTests(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_module("infra/scripts/preflight_deploy.py", "preflight_deploy_test_module")
+        self.original_loader = self.module._load_foundry_sdk
 
     def test_validate_foundry_model_deployment_returns_deployment(self) -> None:
         deployment = SimpleNamespace(
@@ -49,18 +50,21 @@ class FoundryPreflightTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        original_client = self.module.AIProjectClient
-        original_credential = self.module.DefaultAzureCredential
-        self.module.AIProjectClient = FakeClient
-        self.module.DefaultAzureCredential = lambda: object()
+        self.module._load_foundry_sdk = lambda: (
+            FakeClient,
+            DeploymentType,
+            ClientAuthenticationError,
+            Exception,
+            ResourceNotFoundError,
+            lambda: object(),
+        )
         try:
             result = self.module._validate_foundry_model_deployment(
                 "https://example.services.ai.azure.com/api/projects/demo",
                 "gpt-4.1-mini",
             )
         finally:
-            self.module.AIProjectClient = original_client
-            self.module.DefaultAzureCredential = original_credential
+            self.module._load_foundry_sdk = self.original_loader
 
         self.assertIs(result, deployment)
         self.assertEqual(fake_deployments.calls, ["gpt-4.1-mini"])
@@ -83,10 +87,14 @@ class FoundryPreflightTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        original_client = self.module.AIProjectClient
-        original_credential = self.module.DefaultAzureCredential
-        self.module.AIProjectClient = FakeClient
-        self.module.DefaultAzureCredential = lambda: object()
+        self.module._load_foundry_sdk = lambda: (
+            FakeClient,
+            DeploymentType,
+            ClientAuthenticationError,
+            Exception,
+            MissingDeploymentError,
+            lambda: object(),
+        )
         try:
             with self.assertRaises(self.module.PreflightError) as ctx:
                 self.module._validate_foundry_model_deployment(
@@ -94,8 +102,7 @@ class FoundryPreflightTests(unittest.TestCase):
                     "missing-deployment",
                 )
         finally:
-            self.module.AIProjectClient = original_client
-            self.module.DefaultAzureCredential = original_credential
+            self.module._load_foundry_sdk = self.original_loader
 
         self.assertIn("missing-deployment", str(ctx.exception))
         self.assertIn("was not found", str(ctx.exception))
@@ -118,10 +125,14 @@ class FoundryPreflightTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        original_client = self.module.AIProjectClient
-        original_credential = self.module.DefaultAzureCredential
-        self.module.AIProjectClient = FakeClient
-        self.module.DefaultAzureCredential = lambda: object()
+        self.module._load_foundry_sdk = lambda: (
+            FakeClient,
+            DeploymentType,
+            AccessDeniedError,
+            Exception,
+            ResourceNotFoundError,
+            lambda: object(),
+        )
         try:
             with self.assertRaises(self.module.PreflightError) as ctx:
                 self.module._validate_foundry_model_deployment(
@@ -129,8 +140,7 @@ class FoundryPreflightTests(unittest.TestCase):
                     "restricted-deployment",
                 )
         finally:
-            self.module.AIProjectClient = original_client
-            self.module.DefaultAzureCredential = original_credential
+            self.module._load_foundry_sdk = self.original_loader
 
         self.assertIn("restricted-deployment", str(ctx.exception))
         self.assertIn("cannot authenticate or lacks access", str(ctx.exception))

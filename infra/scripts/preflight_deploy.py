@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
-
-from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import DeploymentType
-from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
-from azure.identity import DefaultAzureCredential
 
 
 REQUIRED_PROVIDERS = [
@@ -128,7 +125,18 @@ def _output_value(outputs: dict[str, object], name: str) -> str:
     return str(value["value"])
 
 
+def _load_foundry_sdk() -> tuple[object, object, type[BaseException], type[BaseException], type[BaseException], object]:
+    from azure.ai.projects import AIProjectClient
+    from azure.ai.projects.models import DeploymentType
+    from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
+    from azure.identity import DefaultAzureCredential
+
+    return AIProjectClient, DeploymentType, ClientAuthenticationError, HttpResponseError, ResourceNotFoundError, DefaultAzureCredential
+
+
 def _validate_foundry_model_deployment(project_endpoint: str, model_deployment_name: str) -> object:
+    AIProjectClient, DeploymentType, ClientAuthenticationError, HttpResponseError, ResourceNotFoundError, DefaultAzureCredential = _load_foundry_sdk()
+
     try:
         with AIProjectClient(endpoint=project_endpoint, credential=DefaultAzureCredential()) as project_client:
             deployment = project_client.deployments.get(model_deployment_name)
