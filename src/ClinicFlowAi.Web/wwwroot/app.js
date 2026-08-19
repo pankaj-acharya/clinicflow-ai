@@ -1,5 +1,77 @@
 const slots = document.getElementById("slots");
 const status = document.getElementById("status");
+const askPrompt = document.getElementById("askPrompt");
+const recentPromptList = document.getElementById("recentPromptList");
+const clearPromptHistory = document.getElementById("clearPromptHistory");
+const promptHistoryKey = "clinicflow-ai.recentPrompts";
+const maxPromptHistory = 5;
+
+function loadPromptHistory() {
+  try {
+    const raw = localStorage.getItem(promptHistoryKey);
+    const prompts = raw ? JSON.parse(raw) : [];
+    return Array.isArray(prompts) ? prompts.filter(prompt => typeof prompt === "string" && prompt.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePromptHistory(prompts) {
+  const uniquePrompts = prompts.slice(0, maxPromptHistory);
+  try {
+    localStorage.setItem(promptHistoryKey, JSON.stringify(uniquePrompts));
+  } catch {
+    // Ignore storage failures so the booking flow still works.
+  }
+}
+
+function renderPromptHistory() {
+  if (!recentPromptList) {
+    return;
+  }
+
+  const prompts = loadPromptHistory();
+  if (prompts.length === 0) {
+    recentPromptList.innerHTML = '<span class="prompt-empty">No recent prompts yet.</span>';
+    return;
+  }
+
+  recentPromptList.innerHTML = prompts.map(prompt => (
+    `<button type="button" class="prompt-chip" data-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`
+  )).join("");
+
+  recentPromptList.querySelectorAll(".prompt-chip").forEach(button => {
+    button.addEventListener("click", () => {
+      askPrompt.value = button.dataset.prompt ?? "";
+      askPrompt.focus();
+    });
+  });
+}
+
+function rememberPrompt(prompt) {
+  const prompts = loadPromptHistory().filter(item => item !== prompt);
+  prompts.unshift(prompt);
+  savePromptHistory(prompts);
+  renderPromptHistory();
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+renderPromptHistory();
+
+if (clearPromptHistory) {
+  clearPromptHistory.addEventListener("click", () => {
+    localStorage.removeItem(promptHistoryKey);
+    renderPromptHistory();
+  });
+}
 
 function isoNow() {
   return new Date().toISOString();
@@ -94,7 +166,7 @@ const askStatus = document.getElementById("askStatus");
 const askResults = document.getElementById("askResults");
 
 askBtn.addEventListener("click", async () => {
-  const prompt = document.getElementById("askPrompt").value.trim();
+  const prompt = askPrompt.value.trim();
   if (!prompt) {
     askStatus.textContent = "Please enter a prompt.";
     return;
@@ -116,6 +188,7 @@ askBtn.addEventListener("click", async () => {
 
     const data = await response.json();
     const items = Array.isArray(data) ? data : (data.slots ?? data.results ?? []);
+    rememberPrompt(prompt);
 
     if (items.length === 0) {
       askStatus.textContent = "No matching slots found.";
