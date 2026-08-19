@@ -288,7 +288,6 @@ def _foundry_mode() -> None:
         f"- Foundry project endpoint: `{project_endpoint}`",
         f"- Model deployment: `{model_deployment_name}`",
         f"- Validation: found existing `{str(getattr(deployment, 'type', 'unknown'))}` deployment",
-        f"- Model deployment validation: ready={str(_is_ready_foundry_deployment(deployment)).lower()}",
         f"- Deployment principal: `{principal['display_name']}` ({principal['kind']})",
         f"- Deployment principal object id: `{principal['object_id']}`",
         "- Required bootstrap permission: write-capable Foundry / Azure AI access at the target project or parent resource scope.",
