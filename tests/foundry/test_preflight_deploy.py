@@ -20,6 +20,10 @@ class FakeDeploymentError(Exception):
         self.status_code = status_code
 
 
+class FakeResourceNotFoundError(FakeDeploymentError):
+    pass
+
+
 class FakeDeployments:
     def __init__(self, *, result=None, error=None):
         self.result = result
@@ -53,49 +57,89 @@ class FakeCredential:
 
 
 class FakeReadyDeployment:
+    type = "ModelDeployment"
     status = "Succeeded"
 
 
 class FakeUnreadyDeployment:
+    type = "ModelDeployment"
     status = "Provisioning"
+
+
+class FakeNonModelDeployment:
+    type = "AgentDeployment"
+    status = "Succeeded"
 
 
 class PreflightFoundryValidationTests(unittest.TestCase):
     def setUp(self):
         self.module = load_module()
-        self.original_credential = self.module.DefaultAzureCredential
-        self.original_client = self.module.AIProjectClient
+        self.original_loader = self.module._load_foundry_sdk
 
     def tearDown(self):
-        self.module.DefaultAzureCredential = self.original_credential
-        self.module.AIProjectClient = self.original_client
+        self.module._load_foundry_sdk = self.original_loader
 
-    def test_verify_foundry_model_deployment_succeeds_when_present_and_ready(self):
+    def test_validate_foundry_model_deployment_succeeds_when_present_and_ready(self):
         deployments = FakeDeployments(result=FakeReadyDeployment())
-        self.module.DefaultAzureCredential = lambda: FakeCredential()
-        self.module.AIProjectClient = lambda **kwargs: FakeProjectClient(deployments)
+        self.module._load_foundry_sdk = lambda: (
+            lambda **kwargs: FakeProjectClient(deployments),
+            type("DeploymentType", (), {"MODEL_DEPLOYMENT": "ModelDeployment"}),
+            type("ClientAuthenticationError", (Exception,), {}),
+            type("HttpResponseError", (Exception,), {}),
+            type("ResourceNotFoundError", (Exception,), {}),
+            lambda: FakeCredential(),
+        )
 
-        self.module._verify_foundry_model_deployment("https://example", "demo-model")
+        deployment = self.module._validate_foundry_model_deployment("https://example", "demo-model")
 
+        self.assertIs(deployment, deployments.result)
         self.assertEqual(deployments.requested_name, "demo-model")
 
-    def test_verify_foundry_model_deployment_fails_when_not_ready(self):
+    def test_validate_foundry_model_deployment_fails_when_not_ready(self):
         deployments = FakeDeployments(result=FakeUnreadyDeployment())
-        self.module.DefaultAzureCredential = lambda: FakeCredential()
-        self.module.AIProjectClient = lambda **kwargs: FakeProjectClient(deployments)
+        self.module._load_foundry_sdk = lambda: (
+            lambda **kwargs: FakeProjectClient(deployments),
+            type("DeploymentType", (), {"MODEL_DEPLOYMENT": "ModelDeployment"}),
+            type("ClientAuthenticationError", (Exception,), {}),
+            type("HttpResponseError", (Exception,), {}),
+            type("ResourceNotFoundError", (Exception,), {}),
+            lambda: FakeCredential(),
+        )
 
         with self.assertRaises(self.module.PreflightError) as ctx:
-            self.module._verify_foundry_model_deployment("https://example", "demo-model")
+            self.module._validate_foundry_model_deployment("https://example", "demo-model")
 
         self.assertIn("not ready", str(ctx.exception).lower())
 
-    def test_verify_foundry_model_deployment_fails_fast_when_missing(self):
-        deployments = FakeDeployments(error=FakeDeploymentError(404, "missing"))
-        self.module.DefaultAzureCredential = lambda: FakeCredential()
-        self.module.AIProjectClient = lambda **kwargs: FakeProjectClient(deployments)
+    def test_validate_foundry_model_deployment_fails_when_not_model_deployment(self):
+        deployments = FakeDeployments(result=FakeNonModelDeployment())
+        self.module._load_foundry_sdk = lambda: (
+            lambda **kwargs: FakeProjectClient(deployments),
+            type("DeploymentType", (), {"MODEL_DEPLOYMENT": "ModelDeployment"}),
+            type("ClientAuthenticationError", (Exception,), {}),
+            type("HttpResponseError", (Exception,), {}),
+            type("ResourceNotFoundError", (Exception,), {}),
+            lambda: FakeCredential(),
+        )
 
         with self.assertRaises(self.module.PreflightError) as ctx:
-            self.module._verify_foundry_model_deployment("https://example", "demo-model")
+            self.module._validate_foundry_model_deployment("https://example", "demo-model")
+
+        self.assertIn("not a model deployment", str(ctx.exception).lower())
+
+    def test_validate_foundry_model_deployment_fails_fast_when_missing(self):
+        deployments = FakeDeployments(error=FakeResourceNotFoundError(404, "missing"))
+        self.module._load_foundry_sdk = lambda: (
+            lambda **kwargs: FakeProjectClient(deployments),
+            type("DeploymentType", (), {"MODEL_DEPLOYMENT": "ModelDeployment"}),
+            type("ClientAuthenticationError", (Exception,), {}),
+            type("HttpResponseError", (Exception,), {}),
+            FakeResourceNotFoundError,
+            lambda: FakeCredential(),
+        )
+
+        with self.assertRaises(self.module.PreflightError) as ctx:
+            self.module._validate_foundry_model_deployment("https://example", "demo-model")
 
         self.assertIn("demo-model", str(ctx.exception))
         self.assertIn("https://example", str(ctx.exception))

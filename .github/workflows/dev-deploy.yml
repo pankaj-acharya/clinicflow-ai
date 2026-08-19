@@ -199,7 +199,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install azure-identity azure-ai-projects openai httpx pyyaml azure-monitor-opentelemetry
 
-      - name: Preflight Foundry prerequisites
+      - name: Validate Foundry prerequisites and model deployment
         shell: bash
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

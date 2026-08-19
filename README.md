@@ -49,7 +49,7 @@ The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github
 4. Verifies the ACR role assignments before any image build or push work starts.
 5. Builds and pushes API and gateway images.
 6. Applies the application layer with those image tags.
-7. Validates that `FOUNDRY_MODEL_DEPLOYMENT_NAME` already exists under `FOUNDRY_PROJECT_ENDPOINT`, deploys a prompt agent version into your Foundry project using the assets under [foundry/](foundry/), and runs a smoke test that only checks the agent call succeeds.
+7. Validates Foundry prerequisites, confirms the configured `FOUNDRY_MODEL_DEPLOYMENT_NAME` exists in the target `FOUNDRY_PROJECT_ENDPOINT`, deploys a prompt agent version using the assets under [foundry/](foundry/), and runs a smoke test that only checks the agent call succeeds.
 
 ### Azure bootstrap boundary
 
@@ -65,8 +65,9 @@ The following bootstrap permissions must still exist before the first run:
 - the deployment identity can create Azure resources in the target subscription or resource group
 - the deployment identity can create Azure role assignments for newly created ACR resources, typically through `Owner`, `User Access Administrator`, or `Role Based Access Control Administrator` at a parent scope
 - the deployment identity already has write-capable Foundry / Azure AI access at the target project or parent resource scope, such as `Contributor` or an equivalent tenant-specific Foundry role
+- the configured `FOUNDRY_MODEL_DEPLOYMENT_NAME` already exists in the target Foundry project
 
-If one of those bootstrap permissions is missing, the workflow fails in a preflight stage with remediation guidance before container image build and deployment steps begin.
+If one of those bootstrap permissions or the model deployment check fails, the workflow stops in the Foundry preflight stage with clear remediation guidance before deployment steps begin.
 
 ### Cleanup Options
 
