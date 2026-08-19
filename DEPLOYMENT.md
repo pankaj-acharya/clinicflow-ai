@@ -10,11 +10,16 @@ This document explains how to deploy ClinicFlow AI to Azure.
   - `AZURE_CLIENT_ID`
   - `AZURE_TENANT_ID`
   - `AZURE_SUBSCRIPTION_ID`
-  - `FOUNDRY_PROJECT_ENDPOINT`
+  - `FOUNDRY_PROJECT_ENDPOINT` (points to a pre-created Foundry project endpoint; the workflow does not create this project)
   - `FOUNDRY_MODEL_DEPLOYMENT_NAME` (must already exist in the target Foundry project)
   - `FOUNDRY_AGENT_INSTRUCTIONS`
   - `CLINICFLOW_API_BASE_URL`
   - `CLINICFLOW_GATEWAY_BASE_URL`
+
+Recommended Foundry naming:
+- Foundry resource group: `clinicflow-ai-<env>-foundry-rg`
+- Foundry project: `clinicflow-ai-<env>-foundry`
+- Model deployment: `clinicflow-ai-<env>-<model>`
 
 ## PostgreSQL Setup for Development
 
