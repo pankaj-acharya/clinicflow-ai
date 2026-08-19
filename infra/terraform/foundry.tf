@@ -44,6 +44,10 @@ resource "azapi_resource" "foundry_project" {
   parent_id = azapi_resource.foundry_account.id
   location  = var.region
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   body = {
     properties = {
       displayName = "ClinicFlow AI ${var.environment} Foundry"
