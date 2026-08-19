@@ -50,3 +50,19 @@ output "managed_identity_principal_id" {
 output "deployment_principal_object_id" {
   value = data.azurerm_client_config.current.object_id
 }
+
+output "foundry_resource_group_name" {
+  value = azurerm_resource_group.foundry.name
+}
+
+output "foundry_account_name" {
+  value = azapi_resource.foundry_account.name
+}
+
+output "foundry_project_name" {
+  value = azapi_resource.foundry_project.name
+}
+
+output "foundry_project_endpoint" {
+  value = "https://${azapi_resource.foundry_account.name}.services.ai.azure.com/api/projects/${azapi_resource.foundry_project.name}"
+}
