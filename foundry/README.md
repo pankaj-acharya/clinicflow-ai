@@ -15,11 +15,10 @@ The Foundry project is created by Terraform in a dedicated resource group such a
 
 Required GitHub repository secrets for the Foundry deploy stage:
 
-- `FOUNDRY_MODEL_DEPLOYMENT_NAME` (must reference an existing deployment in the target project)
 - `FOUNDRY_AGENT_INSTRUCTIONS` (optional, can be empty)
 - `CLINICFLOW_API_BASE_URL` (optional)
 - `CLINICFLOW_GATEWAY_BASE_URL` (optional)
 
-The workflow derives the Foundry project endpoint from the same Terraform naming convention, so no manual endpoint secret is needed.
+The workflow derives the Foundry project endpoint and model deployment name from the same Terraform naming convention, so no manual endpoint or model secret is needed.
 
 After deployment, the workflow runs a smoke test that only checks the agent call succeeds.
