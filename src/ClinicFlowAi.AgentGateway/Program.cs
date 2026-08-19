@@ -126,7 +126,7 @@ app.MapPost("/agents/booking/confirm", async (AgentConfirmBookingRequest request
 		? Results.Problem("Unexpected empty response from API.")
 		: Results.Ok(booking);
 });
-app.MapPost("/agents/booking/ask", async (AgentNlSchedulingRequest request, IConfiguration configuration, CancellationToken cancellationToken) =>
+app.MapPost("/agents/booking/ask", async (AgentNlSchedulingRequest request, IHttpClientFactory httpClientFactory, IConfiguration configuration, CancellationToken cancellationToken) =>
 {
     // --- Input validation (gateway independently validates — allowlisted surface) ---
     if (string.IsNullOrWhiteSpace(request.Prompt))
@@ -143,22 +143,46 @@ app.MapPost("/agents/booking/ask", async (AgentNlSchedulingRequest request, ICon
 
     // Normalise MaxResults: 0 → 1, >10 → 10 (silent, no rejection)
     var count = request.MaxResults < 1 ? 1 : Math.Clamp(request.MaxResults, 1, 10);
-    var inferredClinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt);
-    var inferredClinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt);
-    var inferredPreferredTimeOfDay = PromptSchedulingInference.InferPreferredTimeOfDay(request.Prompt, request.PreferredTimeOfDay);
 
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",
-        inferredClinicianRole, count);
+        request.ClinicianRole, count);
+
+    try
+    {
+        var client = httpClientFactory.CreateClient("ClinicFlowApi");
+        using var upstreamResponse = await client.PostAsJsonAsync(
+            "/ask",
+            new
+            {
+                prompt = request.Prompt,
+                clinicianRole = request.ClinicianRole,
+                clinicianName = request.ClinicianName,
+                preferredDays = request.PreferredDays,
+                preferredTimeOfDay = request.PreferredTimeOfDay,
+                maxResults = count
+            },
+            cancellationToken);
+
+        if (upstreamResponse.IsSuccessStatusCode)
+        {
+            var payload = await upstreamResponse.Content.ReadAsStringAsync(cancellationToken);
+            return Results.Content(
+                payload,
+                upstreamResponse.Content.Headers.ContentType?.ToString() ?? "application/json",
+                null,
+                (int)upstreamResponse.StatusCode);
+        }
+
+        app.Logger.LogWarning("API ask endpoint returned {StatusCode}, using fallback", (int)upstreamResponse.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "API ask endpoint unavailable, using fallback");
+    }
 
     var response = await InvokeFoundryOrFallbackAsync(
-        request with
-        {
-            ClinicianName = inferredClinicianName,
-            ClinicianRole = inferredClinicianRole,
-            PreferredTimeOfDay = inferredPreferredTimeOfDay,
-            MaxResults = count
-        },
+        request with { MaxResults = count },
         configuration,
         cancellationToken);
     return Results.Ok(response);
