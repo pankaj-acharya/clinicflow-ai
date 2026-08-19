@@ -154,11 +154,22 @@ app.MapPost("/ask", async (NlSchedulingRequest request, [FromServices] IHttpClie
         ?.Where(d => !string.IsNullOrWhiteSpace(d) && validDayNames.Contains(d.Trim().ToLowerInvariant()))
         .ToArray();
 
+    var inferredClinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt);
+    var inferredClinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt);
+    var inferredPreferredTimeOfDay = PromptSchedulingInference.InferPreferredTimeOfDay(request.Prompt, request.PreferredTimeOfDay);
+
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",
-        request.ClinicianRole, count);
+        inferredClinicianRole, count);
 
-    var normalised = request with { MaxResults = count, PreferredDays = filteredDays };
+    var normalised = request with
+    {
+        ClinicianName = inferredClinicianName,
+        ClinicianRole = inferredClinicianRole,
+        PreferredDays = filteredDays,
+        PreferredTimeOfDay = inferredPreferredTimeOfDay,
+        MaxResults = count
+    };
 
     try
     {
@@ -197,7 +208,7 @@ app.MapPost("/ask", async (NlSchedulingRequest request, [FromServices] IHttpClie
     {
         var slots = GenerateStubSlots(normalised, count);
         var stubResponse = new NlSchedulingResponse(
-            InterpretedIntent: $"Stub: schedule with {normalised.ClinicianRole ?? "any clinician"}",
+            InterpretedIntent: $"Stub: schedule with {normalised.ClinicianRole ?? "any clinician"}{(normalised.PreferredTimeOfDay is null ? "" : $" in the {normalised.PreferredTimeOfDay}")}",
             Slots: slots,
             Message: slots.Count == 0 ? "No slots found matching your criteria" : null);
         return Results.Ok(stubResponse);
@@ -219,16 +230,15 @@ static string GenerateSlotId(string clinicianId, DateTimeOffset startsAtUtc)
 
 static IReadOnlyList<AvailableSlotOption> GenerateStubSlots(NlSchedulingRequest request, int count)
 {
-    var clinicianId = request.ClinicianName is not null
-        ? request.ClinicianName.Replace(" ", "").ToLowerInvariant()
-        : "clinician-1";
-    var clinicianName = request.ClinicianName ?? "Dr. Default";
-    var clinicianRole = request.ClinicianRole ?? "General Practitioner";
+    var clinicianName = request.ClinicianName ?? PromptSchedulingInference.InferClinicianName(request.Prompt) ?? "Dr Default";
+    var clinicianRole = request.ClinicianRole ?? PromptSchedulingInference.InferClinicianRole(request.Prompt) ?? "General Practitioner";
+    var clinicianId = clinicianName.Replace(" ", "").ToLowerInvariant();
+    var earliestStartTime = PromptSchedulingInference.InferEarliestStartTime(request.Prompt, request.PreferredTimeOfDay) ?? new TimeOnly(9, 0);
 
     var slots = new List<AvailableSlotOption>(count);
-    // Start from tomorrow at 09:00 UTC
+    // Start from tomorrow at the earliest time implied by the prompt if any.
     var baseDate = DateTimeOffset.UtcNow.Date.AddDays(1);
-    var cursor = new DateTimeOffset(baseDate, TimeSpan.Zero).AddHours(9);
+    var cursor = new DateTimeOffset(baseDate, TimeSpan.Zero).Add(earliestStartTime.ToTimeSpan());
 
     for (int i = 0; i < count; i++)
     {

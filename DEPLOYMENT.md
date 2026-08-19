@@ -94,7 +94,7 @@ The exact FQDNs are emitted by `terraform output` at the end of the workflow (lo
    - `Show me next available dentist appointment`
    - `When is the next appointment with Hygienist Mrs Smith, preferably Monday morning?`
    - `Show me next 5 appointments with any dentist`
-3. Click **Ask AI** — the Web UI calls `/ask` → API → Azure AI Foundry agent → LLM.
+3. Click **Ask AI** — the Web UI calls `/ask` → API → Azure AI Foundry agent → LLM. The prompt parser also understands follow-up hints like "afternoon" or "after 2 PM" so the results can narrow within the same session.
 4. The AI returns matching slots; click **Book this** on any slot.
 5. The UI POSTs `/book` → API → PostgreSQL; a ✅ calendar confirmation card appears.
 6. To browse raw availability without AI, scroll down to the **Browse availability** section, choose a clinician from the dropdown, and click **Load availability**. Slots for the next 14 days are displayed.
