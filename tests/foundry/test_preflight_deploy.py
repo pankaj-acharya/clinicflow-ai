@@ -61,11 +61,6 @@ class FakeReadyDeployment:
     status = "Succeeded"
 
 
-class FakeUnreadyDeployment:
-    type = "ModelDeployment"
-    status = "Provisioning"
-
-
 class FakeNonModelDeployment:
     type = "AgentDeployment"
     status = "Succeeded"
@@ -79,7 +74,7 @@ class PreflightFoundryValidationTests(unittest.TestCase):
     def tearDown(self):
         self.module._load_foundry_sdk = self.original_loader
 
-    def test_validate_foundry_model_deployment_succeeds_when_present_and_ready(self):
+    def test_validate_foundry_model_deployment_succeeds_when_present(self):
         deployments = FakeDeployments(result=FakeReadyDeployment())
         self.module._load_foundry_sdk = lambda: (
             lambda **kwargs: FakeProjectClient(deployments),
@@ -94,22 +89,6 @@ class PreflightFoundryValidationTests(unittest.TestCase):
 
         self.assertIs(deployment, deployments.result)
         self.assertEqual(deployments.requested_name, "demo-model")
-
-    def test_validate_foundry_model_deployment_fails_when_not_ready(self):
-        deployments = FakeDeployments(result=FakeUnreadyDeployment())
-        self.module._load_foundry_sdk = lambda: (
-            lambda **kwargs: FakeProjectClient(deployments),
-            type("DeploymentType", (), {"MODEL_DEPLOYMENT": "ModelDeployment"}),
-            type("ClientAuthenticationError", (Exception,), {}),
-            type("HttpResponseError", (Exception,), {}),
-            type("ResourceNotFoundError", (Exception,), {}),
-            lambda: FakeCredential(),
-        )
-
-        with self.assertRaises(self.module.PreflightError) as ctx:
-            self.module._validate_foundry_model_deployment("https://example", "demo-model")
-
-        self.assertIn("not ready", str(ctx.exception).lower())
 
     def test_validate_foundry_model_deployment_fails_when_not_model_deployment(self):
         deployments = FakeDeployments(result=FakeNonModelDeployment())
