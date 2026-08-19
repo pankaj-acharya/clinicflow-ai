@@ -143,7 +143,6 @@ app.MapPost("/agents/booking/ask", async (AgentNlSchedulingRequest request, IHtt
 
     // Normalise MaxResults: 0 → 1, >10 → 10 (silent, no rejection)
     var count = request.MaxResults < 1 ? 1 : Math.Clamp(request.MaxResults, 1, 10);
-
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",
         request.ClinicianRole, count);

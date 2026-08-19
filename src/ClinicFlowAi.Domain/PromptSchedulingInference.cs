@@ -10,7 +10,6 @@ public sealed record PromptSchedulingFilters(
     TimeOnly? EarliestStartTime,
     IReadOnlySet<DayOfWeek> PreferredWeekdays,
     IReadOnlySet<DateOnly> PreferredDates);
-
 public static class PromptSchedulingInference
 {
     private static readonly HashSet<string> ClinicianNameStopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -54,7 +53,6 @@ public static class PromptSchedulingInference
     private static readonly Regex NextWeekdayPattern = new(
         @"\b(?:next|this|coming)\s+(?<day>monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     public static string? InferClinicianName(string prompt)
     {
         var match = WithClinicianNamePattern.Match(prompt);
@@ -149,7 +147,6 @@ public static class PromptSchedulingInference
             PreferredWeekdays: inferredPreferredDays,
             PreferredDates: inferredPreferredDates);
     }
-
     private static string CanonicalizeClinicianName(Match match)
     {
         var title = match.Groups["title"].Value.Equals("dr", StringComparison.OrdinalIgnoreCase)
@@ -221,7 +218,6 @@ public static class PromptSchedulingInference
                 weekdays.Add(ParseDayOfWeek(candidate));
             }
         }
-
         return weekdays;
     }
 
@@ -445,7 +441,6 @@ public static class PromptSchedulingInference
 
         return referenceDate.AddDays(daysUntilTarget);
     }
-
     private static string TimeOfDayFor(TimeOnly time)
     {
         if (time < new TimeOnly(12, 0))

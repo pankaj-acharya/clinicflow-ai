@@ -163,7 +163,7 @@ app.MapPost("/ask", async (
         request.ClinicianName,
         request.ClinicianRole,
         request.PreferredTimeOfDay,
-        request.PreferredDays);
+        filteredDays);
 
     // Audit-safe: log role and count only — NOT prompt text, NOT clinician name
     app.Logger.LogInformation("NlScheduling request received. Role={Role} MaxResults={MaxResults}",

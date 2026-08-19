@@ -58,12 +58,12 @@ public sealed class SchedulingPromptInferenceTests
 
         await using var factory = new WebApplicationFactory<ApiHost::Program>()
             .WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
             {
-                services.AddSingleton<IAppointmentRepository>(new FakeAppointmentRepository(CreateSeedSlots(friday, monday)));
+                builder.ConfigureServices(services =>
+                {
+                    services.AddSingleton<IAppointmentRepository>(new FakeAppointmentRepository(CreateSeedSlots(friday, monday)));
+                });
             });
-        });
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsync(
