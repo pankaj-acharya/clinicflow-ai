@@ -234,36 +234,21 @@ resource "azurerm_key_vault_secret" "clinicflow_api_base_url" {
 
 
 # ---------------------------------------------------------------------------
-# Import existing PostgreSQL server into Terraform state if not tracked yet.
-# Safe to keep permanently — Terraform skips if already in state.
-# ---------------------------------------------------------------------------
-import {
-  to = azurerm_postgresql_flexible_server.this[0]
-  id = "/subscriptions/3e430fb8-73f7-4930-a2ec-645fd80f5661/resourceGroups/clinicflow-ai-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/clinicflow-ai-dev-psql"
-}
-
-# Import the pre-existing firewall rule that was created manually.
-# Safe to keep permanently — Terraform skips if already in state.
-import {
-  to = azurerm_postgresql_flexible_server_firewall_rule.allow_azure_services[0]
-  id = "/subscriptions/3e430fb8-73f7-4930-a2ec-645fd80f5661/resourceGroups/clinicflow-ai-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/clinicflow-ai-dev-psql/firewallRules/allow-azure-services"
-}
-# ---------------------------------------------------------------------------
 # PostgreSQL Flexible Server
 # ---------------------------------------------------------------------------
 
 resource "azurerm_postgresql_flexible_server" "this" {
-  count               = var.deploy_postgres ? 1 : 0
-  name                = local.postgres_server_name
-  resource_group_name = azurerm_resource_group.this.name
-  location            = azurerm_resource_group.this.location
-  version             = "16"
+  count                  = var.deploy_postgres ? 1 : 0
+  name                   = local.postgres_server_name
+  resource_group_name    = azurerm_resource_group.this.name
+  location               = azurerm_resource_group.this.location
+  version                = "16"
   administrator_login    = var.postgres_admin_user
   administrator_password = var.postgres_admin_password
-  storage_mb          = 32768
-  sku_name            = "B_Standard_B1ms"
-  zone                = "1"
-  backup_retention_days = 7
+  storage_mb             = 32768
+  sku_name               = "B_Standard_B1ms"
+  zone                   = "1"
+  backup_retention_days  = 7
 }
 
 resource "azurerm_postgresql_flexible_server_database" "this" {
@@ -437,4 +422,3 @@ resource "azurerm_container_app" "web" {
     }
   }
 }
-
