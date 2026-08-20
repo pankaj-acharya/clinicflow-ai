@@ -40,6 +40,10 @@ The dev deployment target is Azure Container Apps with supporting infrastructure
 - Resource group, Container Apps environment, App Insights, Log Analytics, managed identity, Key Vault, and ACR.
 - API and Agent Gateway container apps, each with its own image and ingress endpoint.
 - Gateway-to-API wiring through `ClinicFlowApi:BaseUrl`, injected from Key Vault during deployment.
+- All sensitive configuration (App Insights connection string, Postgres connection string, API base URL) stored in Key Vault and injected as Container App secrets — never as plaintext environment variables.
+- PostgreSQL access restricted to Container Apps environment outbound IPs only — the open "Allow Azure Services" rule is not used.
+- `ASPNETCORE_ENVIRONMENT` is set to `Staging` in dev and `Production` in prod — the Developer Exception Page is never active in cloud deployments.
+- Key Vault purge protection is enabled; the CI pipeline cannot permanently delete secrets.
 
 The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github/workflows/dev-deploy.yml). It must be dispatched from `main` because the Azure workload identity federation is scoped to that branch. It:
 
@@ -49,39 +53,40 @@ The deployment workflow is defined in [.github/workflows/dev-deploy.yml](.github
 4. Verifies the ACR role assignments before any image build or push work starts.
 5. Builds and pushes API and gateway images.
 6. Applies the application layer with those image tags.
-7. Provisions the Foundry project and model deployment in Terraform, validates Foundry prerequisites, confirms the Terraform-managed model deployment exists in the Terraform-managed `FOUNDRY_PROJECT_ENDPOINT`, deploys a prompt agent version using the assets under [foundry/](foundry/), and runs a smoke test that only checks the agent call succeeds.
+7. Resolves Container Apps outbound IPs and restricts PostgreSQL firewall to those IPs only.
+8. Provisions the Foundry project and model deployment in Terraform, validates Foundry prerequisites, confirms the Terraform-managed model deployment exists, deploys a prompt agent version (with instruction validation), and runs a smoke test.
+
+For full deployment details, security controls, and troubleshooting, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Azure bootstrap boundary
 
-The pipeline now manages the repeatable, in-scope prerequisites that it can create itself:
+The pipeline manages these prerequisites automatically:
 
-- Azure resource provider registration for `Microsoft.App`, `Microsoft.CognitiveServices`, `Microsoft.ContainerRegistry`, `microsoft.insights`, `Microsoft.KeyVault`, `Microsoft.ManagedIdentity`, `Microsoft.OperationalInsights`, and `Microsoft.Storage`
-- `AcrPush` on the created ACR for the GitHub Actions deployment identity
-- `User Access Administrator` on the created ACR for the GitHub Actions deployment identity
-- `AcrPull` on the created ACR for the user-assigned managed identity used by Container Apps
+- Azure resource provider registration
+- `AcrPush` and `User Access Administrator` on ACR for the deployment identity
+- `AcrPull` on ACR for the managed identity used by Container Apps
 
-The following bootstrap permissions must still exist before the first run:
+The following must exist before the first run:
 
-- the deployment identity can create Azure resources in the target subscription or resource group
-- the deployment identity can create Azure role assignments for newly created ACR resources, typically through `Owner`, `User Access Administrator`, or `Role Based Access Control Administrator` at a parent scope
-- the deployment identity already has write-capable Foundry / Azure AI access at the target project or parent resource scope, such as `Contributor` or an equivalent tenant-specific Foundry role
-- the Terraform-managed Foundry model deployment exists and the deployment identity can read it
+- Deployment identity can create Azure resources in the target subscription
+- Deployment identity can create RBAC role assignments on ACR (typically via `Owner` or `User Access Administrator` at a parent scope)
+- Deployment identity has write-capable Foundry / Azure AI access at the project or parent resource scope
+- Terraform-managed Foundry model deployment exists and is readable by the deployment identity
 
-If one of those bootstrap permissions or the model deployment check fails, the workflow stops in the Foundry preflight stage with clear remediation guidance before deployment steps begin.
+If any check fails, the workflow stops with clear remediation guidance before deployment begins.
 
 ### Cleanup Options
 
 The workflow supports optional resource cleanup to reduce Azure costs:
 
-- **Destroy All Resources** (`destroy_resources` checkbox): Runs `terraform destroy` to remove all provisioned infrastructure (Container Apps, ACR, App Insights, Key Vault, etc.). The Terraform state backend storage account is preserved for future deployments.
-- **Destroy Foundry Agents Only** (`destroy_foundry_agents` checkbox): Removes only agent versions from your Foundry project. The Foundry project, AI Services, and model deployments are preserved.
+- **Destroy All Resources** (`destroy_resources` checkbox): Runs `terraform destroy` to remove all provisioned infrastructure. The Terraform state backend storage account is preserved.
+- **Destroy Foundry Agents Only** (`destroy_foundry_agents` checkbox): Removes only agent versions. The Foundry project, AI Services, and model deployments are preserved.
 
 To use cleanup:
 
 1. Go to **Actions** → **dev-deploy** in GitHub
 2. Click **Run workflow**
 3. Check the desired cleanup option(s) and run
-4. Only the cleanup job(s) will execute (deployment is skipped)
 
 ## Fixed Local Ports
 

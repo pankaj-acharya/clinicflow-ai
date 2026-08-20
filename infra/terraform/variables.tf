@@ -51,3 +51,9 @@ variable "postgres_admin_password" {
   sensitive   = true
   default     = ""
 }
+
+variable "container_apps_outbound_ip_ranges" {
+  description = "Outbound IP ranges of the Container Apps environment, used to restrict PostgreSQL firewall access. Populated automatically by the pipeline after infra apply."
+  type        = list(string)
+  default     = []
+}

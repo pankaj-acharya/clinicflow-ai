@@ -161,6 +161,37 @@ jobs:
             -var="gateway_image=${GATEWAY_IMAGE}" \
             -var="web_image=${WEB_IMAGE}"
 
+      - name: Restrict PostgreSQL firewall to Container Apps outbound IPs
+        shell: bash
+        run: |
+          echo "=================================================="
+          echo "=== Resolving Container Apps outbound IPs ========"
+          echo "=================================================="
+
+          CAE_NAME="clinicflow-ai-${TF_VAR_environment}-cae"
+          RG_NAME="clinicflow-ai-${TF_VAR_environment}-rg"
+
+          # Retrieve outbound IP ranges from the Container Apps environment
+          OUTBOUND_IPS=$(az containerapp env show \
+            --name "$CAE_NAME" \
+            --resource-group "$RG_NAME" \
+            --query "properties.staticIp" \
+            -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$OUTBOUND_IPS" ]; then
+            echo "⚠️ Warning: Could not resolve Container Apps outbound IPs — PostgreSQL firewall rules not updated"
+          else
+            # Convert to Terraform list format and re-apply only the firewall rules
+            echo "✅ Resolved outbound IPs: $OUTBOUND_IPS"
+            IP_LIST=$(echo "$OUTBOUND_IPS" | tr '\n' ',' | sed 's/,$//')
+            cd infra/terraform
+            terraform apply -auto-approve \
+              -var="deploy_postgres=true" \
+              -var="container_apps_outbound_ip_ranges=[\"${IP_LIST//,/\",\"}\"]" \
+              -target='azurerm_postgresql_flexible_server_firewall_rule.container_apps_outbound'
+            echo "✅ PostgreSQL firewall restricted to Container Apps outbound IPs"
+          fi
+
       - name: Show deployed endpoints
         working-directory: infra/terraform
         run: terraform output
