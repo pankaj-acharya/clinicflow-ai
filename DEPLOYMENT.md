@@ -10,16 +10,39 @@ This document explains how to deploy ClinicFlow AI to Azure.
   - `AZURE_CLIENT_ID`
   - `AZURE_TENANT_ID`
   - `AZURE_SUBSCRIPTION_ID`
-  - `FOUNDRY_AGENT_INSTRUCTIONS`
-  - `CLINICFLOW_API_BASE_URL`
-  - `CLINICFLOW_GATEWAY_BASE_URL`
+  - `POSTGRES_ADMIN_PASSWORD`
+  - `FOUNDRY_AGENT_INSTRUCTIONS` (optional — validated for max length and injection phrases before use)
+  - `CLINICFLOW_API_BASE_URL` (optional)
+  - `CLINICFLOW_GATEWAY_BASE_URL` (optional)
 
-The Foundry project is now created by Terraform using deterministic names:
+The Foundry project is created by Terraform using deterministic names:
 - Foundry resource group: `clinicflow-ai-<env>-foundry-rg`
 - Foundry account: `clinicflowai<env>foundry`
 - Foundry project: `clinicflow-ai-<env>-foundry`
 - Foundry model deployment: `clinicflow-ai-<env>-model`
 - Project endpoint: `https://clinicflowai<env>foundry.services.ai.azure.com/api/projects/clinicflow-ai-<env>-foundry`
+
+## Security Hardening (Automated)
+
+All security controls below are applied automatically by Terraform and the pipeline — no manual Azure steps are needed.
+
+### Secrets management
+- **Application Insights connection string** is stored in Key Vault and injected into Container Apps via `secret_name` — never as a plaintext environment variable. This prevents ARM Reader exposure.
+- **PostgreSQL connection string**, **App Insights instrumentation key**, and **API base URL** are all Key Vault-backed secrets referenced by Container Apps at runtime.
+- Key Vault has **purge protection enabled** (`purge_protection_enabled = true`). The CI identity does not hold the `Purge` permission, preventing permanent secret deletion from the pipeline.
+
+### PostgreSQL network security
+- The open `0.0.0.0/0.0.0.0` ("Allow Azure Services") firewall rule has been removed.
+- The pipeline automatically resolves the Container Apps environment outbound IPs after deployment and applies a targeted Terraform update to restrict PostgreSQL access to those IPs only.
+- No other Azure-hosted workloads can reach the database.
+
+### Application environment
+- `ASPNETCORE_ENVIRONMENT` is derived from `var.environment`: `Production` for `prod`, `Staging` for all other environments.
+- The ASP.NET Core Developer Exception Page is never active in cloud deployments.
+
+### Foundry agent instructions validation
+- `FOUNDRY_AGENT_INSTRUCTIONS` is validated before use as the LLM system prompt: max 2000 characters and blocked injection phrases (`ignore previous instructions`, `system override`, etc.).
+- Deployment fails fast with a clear error if validation fails.
 
 ## PostgreSQL Setup for Development
 
@@ -59,11 +82,12 @@ The `dev-deploy.yml` workflow runs on manual dispatch and performs:
 
 > Run it from `main`; feature-branch dispatches are intentionally skipped because the Azure workload identity federation is scoped to `main`.
 
-1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, etc.)
+1. **Base Infrastructure** (Resource Group, ACR, Key Vault, PostgreSQL, App Insights, etc.)
 2. **Container Apps** (API, Agent Gateway, and Web UI deployments)
-3. **Foundry Preflight** (validates the Terraform-managed Foundry model deployment against the Terraform-managed Foundry project endpoint)
-4. **Foundry Agent** (Booking assistant deployment plus a minimal smoke test)
-5. **Cleanup** (Optional: destroys resources or just Foundry agents)
+3. **PostgreSQL firewall update** — resolves Container Apps outbound IPs and restricts database access to those IPs only
+4. **Foundry Preflight** (validates the Terraform-managed Foundry model deployment)
+5. **Foundry Agent** (Booking assistant deployment plus a minimal smoke test)
+6. **Cleanup** (Optional: destroys resources or just Foundry agents)
 
 The Foundry stage fails fast if the configured model deployment is missing and then runs a post-deploy smoke test that only checks the agent invocation succeeds.
 

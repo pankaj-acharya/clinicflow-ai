@@ -15,10 +15,25 @@ The Foundry project is created by Terraform in a dedicated resource group such a
 
 Required GitHub repository secrets for the Foundry deploy stage:
 
-- `FOUNDRY_AGENT_INSTRUCTIONS` (optional, can be empty)
+- `FOUNDRY_AGENT_INSTRUCTIONS` (optional — validated before use; see security note below)
 - `CLINICFLOW_API_BASE_URL` (optional)
 - `CLINICFLOW_GATEWAY_BASE_URL` (optional)
 
 The workflow derives the Foundry project endpoint and model deployment name from the same Terraform naming convention, so no manual endpoint or model secret is needed.
 
 After deployment, the workflow runs a smoke test that only checks the agent call succeeds.
+
+## Security: Agent Instructions Validation
+
+`FOUNDRY_AGENT_INSTRUCTIONS` is validated before being used as the LLM system prompt:
+
+- **Max length**: 2000 characters — prevents prompt stuffing.
+- **Blocked phrases**: `ignore previous instructions`, `system override`, `new persona`, `bypass safety`, and others — prevents cross-prompt injection (XPIA) attempts.
+
+If validation fails, the deployment step fails fast with a clear error message. The default built-in instructions are used when the secret is empty or not set.
+
+To update agent instructions safely:
+1. Update the `FOUNDRY_AGENT_INSTRUCTIONS` GitHub secret with the new content.
+2. Ensure the content is under 2000 characters and contains no blocked phrases.
+3. Re-run the `dev-deploy` workflow — the new instructions will be validated and deployed automatically.
+
