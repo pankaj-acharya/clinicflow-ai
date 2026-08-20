@@ -1,10 +1,29 @@
 import json
 import os
+import re
 from pathlib import Path
 
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity import DefaultAzureCredential
+
+# Maximum allowed length for agent instructions to prevent prompt stuffing
+_MAX_INSTRUCTIONS_LENGTH = 2000
+
+# Phrases that indicate a prompt injection attempt in the instructions
+_BLOCKED_PHRASES = [
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard previous",
+    "system override",
+    "forget all instructions",
+    "new persona",
+    "bypass safety",
+    "you are now",
+    "act as if",
+    "pretend you are",
+    "do not follow",
+]
 
 
 def _require_env(name: str) -> str:
@@ -18,6 +37,25 @@ def _optional_env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _validate_instructions(content: str) -> None:
+    """Fail fast if agent instructions exceed safe length or contain injection patterns."""
+    if len(content) > _MAX_INSTRUCTIONS_LENGTH:
+        raise RuntimeError(
+            f"FOUNDRY_AGENT_INSTRUCTIONS exceeds maximum allowed length of "
+            f"{_MAX_INSTRUCTIONS_LENGTH} characters (got {len(content)}). "
+            "Shorten the instructions or store them in Key Vault with a reviewed value."
+        )
+
+    content_lower = content.lower()
+    for phrase in _BLOCKED_PHRASES:
+        if phrase in content_lower:
+            raise RuntimeError(
+                f"FOUNDRY_AGENT_INSTRUCTIONS contains a blocked phrase: '{phrase}'. "
+                "This may indicate a prompt injection attempt. "
+                "Review the instructions in Key Vault before redeploying."
+            )
+
+
 def _should_enable_insights() -> bool:
     """Check if AppInsights logging is enabled via environment variable."""
     enabled_str = _optional_env("ENABLE_FOUNDRY_INSIGHTS_LOGGING", "false").lower()
@@ -27,6 +65,7 @@ def _should_enable_insights() -> bool:
 def _build_instructions() -> str:
     provided = os.getenv("FOUNDRY_AGENT_INSTRUCTIONS", "").strip()
     if provided:
+        _validate_instructions(provided)
         return provided
 
     api_base_url = os.getenv("CLINICFLOW_API_BASE_URL", "").strip()

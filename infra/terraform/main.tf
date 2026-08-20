@@ -112,7 +112,7 @@ resource "azurerm_key_vault" "this" {
   resource_group_name         = azurerm_resource_group.this.name
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   sku_name                    = "standard"
-  purge_protection_enabled    = false
+  purge_protection_enabled    = true
   soft_delete_retention_days  = 7
   enabled_for_disk_encryption = true
 
@@ -120,6 +120,7 @@ resource "azurerm_key_vault" "this" {
     tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = data.azurerm_client_config.current.object_id
 
+    # Purge intentionally omitted — CI pipeline has no need to permanently delete secrets
     secret_permissions = [
       "Get",
       "List",
@@ -128,7 +129,6 @@ resource "azurerm_key_vault" "this" {
       "Recover",
       "Backup",
       "Restore",
-      "Purge"
     ]
   }
 
@@ -177,6 +177,12 @@ resource "azurerm_container_app" "api" {
     }
   }
 
+  secret {
+    name                = "appinsights-connection-string"
+    key_vault_secret_id = azurerm_key_vault_secret.appinsights_connection_string.versionless_id
+    identity            = azurerm_user_assigned_identity.this.id
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -205,12 +211,12 @@ resource "azurerm_container_app" "api" {
 
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
-        value = "Development"
+        value = var.environment == "prod" ? "Production" : "Staging"
       }
 
       env {
-        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
-        value = azurerm_application_insights.this.connection_string
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "appinsights-connection-string"
       }
 
       dynamic "env" {
@@ -258,12 +264,13 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
   collation = "en_US.utf8"
 }
 
-resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure_services" {
-  count            = var.deploy_postgres ? 1 : 0
-  name             = "allow-azure-services"
+resource "azurerm_postgresql_flexible_server_firewall_rule" "container_apps_outbound" {
+  for_each = var.deploy_postgres ? toset(var.container_apps_outbound_ip_ranges) : toset([])
+
+  name             = "allow-containerapp-${replace(each.value, "/", "-")}"
   server_id        = azurerm_postgresql_flexible_server.this[0].id
-  start_ip_address = "0.0.0.0"
-  end_ip_address   = "0.0.0.0"
+  start_ip_address = cidrhost(each.value, 0)
+  end_ip_address   = cidrhost(each.value, -1)
 }
 
 
@@ -288,6 +295,14 @@ resource "azurerm_key_vault_secret" "appinsights_instrumentation_key" {
   key_vault_id = azurerm_key_vault.this.id
 }
 
+# AppInsights connection string stored in Key Vault — referenced by Container Apps as a secret
+# (not injected as plaintext env var to avoid ARM Reader exposure)
+resource "azurerm_key_vault_secret" "appinsights_connection_string" {
+  name         = "appinsights-connection-string"
+  value        = azurerm_application_insights.this.connection_string
+  key_vault_id = azurerm_key_vault.this.id
+}
+
 resource "azurerm_container_app" "gateway" {
   count                        = var.deploy_container_apps ? 1 : 0
   name                         = local.gateway_container_app_name
@@ -308,6 +323,12 @@ resource "azurerm_container_app" "gateway" {
   secret {
     name                = "clinicflow-api-base-url"
     key_vault_secret_id = azurerm_key_vault_secret.clinicflow_api_base_url[0].versionless_id
+    identity            = azurerm_user_assigned_identity.this.id
+  }
+
+  secret {
+    name                = "appinsights-connection-string"
+    key_vault_secret_id = azurerm_key_vault_secret.appinsights_connection_string.versionless_id
     identity            = azurerm_user_assigned_identity.this.id
   }
 
@@ -339,7 +360,7 @@ resource "azurerm_container_app" "gateway" {
 
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
-        value = "Development"
+        value = var.environment == "prod" ? "Production" : "Staging"
       }
 
       env {
@@ -348,8 +369,8 @@ resource "azurerm_container_app" "gateway" {
       }
 
       env {
-        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
-        value = azurerm_application_insights.this.connection_string
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "appinsights-connection-string"
       }
     }
   }
@@ -375,6 +396,12 @@ resource "azurerm_container_app" "web" {
   secret {
     name                = "clinicflow-api-base-url"
     key_vault_secret_id = azurerm_key_vault_secret.clinicflow_api_base_url[0].versionless_id
+    identity            = azurerm_user_assigned_identity.this.id
+  }
+
+  secret {
+    name                = "appinsights-connection-string"
+    key_vault_secret_id = azurerm_key_vault_secret.appinsights_connection_string.versionless_id
     identity            = azurerm_user_assigned_identity.this.id
   }
 
@@ -406,7 +433,7 @@ resource "azurerm_container_app" "web" {
 
       env {
         name  = "ASPNETCORE_ENVIRONMENT"
-        value = "Development"
+        value = var.environment == "prod" ? "Production" : "Staging"
       }
 
       env {
@@ -415,8 +442,8 @@ resource "azurerm_container_app" "web" {
       }
 
       env {
-        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
-        value = azurerm_application_insights.this.connection_string
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "appinsights-connection-string"
       }
     }
   }
