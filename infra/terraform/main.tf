@@ -267,10 +267,10 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
 resource "azurerm_postgresql_flexible_server_firewall_rule" "container_apps_outbound" {
   for_each = var.deploy_postgres ? toset(var.container_apps_outbound_ip_ranges) : toset([])
 
-  name             = "allow-containerapp-${replace(each.value, "/", "-")}"
+  name             = "allow-containerapp-${replace(replace(each.value, ".", "-"), "/", "-")}"
   server_id        = azurerm_postgresql_flexible_server.this[0].id
-  start_ip_address = cidrhost(each.value, 0)
-  end_ip_address   = cidrhost(each.value, -1)
+  start_ip_address = each.value
+  end_ip_address   = each.value
 }
 
 
