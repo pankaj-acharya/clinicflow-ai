@@ -101,6 +101,9 @@ jobs:
             -target=azurerm_resource_group.this \
             -target=azurerm_log_analytics_workspace.this \
             -target=azurerm_application_insights.this \
+            -target=azurerm_key_vault_secret.appinsights_instrumentation_key \
+            -target=azurerm_key_vault_secret.appinsights_connection_string \
+            -target=azurerm_key_vault_secret.enable_foundry_insights_logging \
             -target=azurerm_user_assigned_identity.this \
             -target=azurerm_container_registry.this \
             -target=azurerm_role_assignment.acr_pull \
@@ -109,8 +112,11 @@ jobs:
             -target=azurerm_key_vault.this \
             -target='azurerm_postgresql_flexible_server.this[0]' \
             -target='azurerm_postgresql_flexible_server_database.this[0]' \
-            -target='azurerm_postgresql_flexible_server_firewall_rule.allow_azure_services[0]' \
             -target=azurerm_container_app_environment.this \
+            -target=azurerm_resource_group.foundry \
+            -target=azapi_resource.foundry_account \
+            -target=azapi_resource.foundry_project \
+            -target=azapi_resource.foundry_model_deployment \
             -var="deploy_postgres=true"
 
       - name: Capture Terraform outputs

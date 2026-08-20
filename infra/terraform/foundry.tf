@@ -31,6 +31,7 @@ resource "azapi_resource" "foundry_account" {
       dynamicThrottlingEnabled      = false
       publicNetworkAccess           = "Enabled"
       restrictOutboundNetworkAccess = false
+      restore                       = true
     }
     sku = {
       name = "S0"
