@@ -24,5 +24,11 @@ provider "azurerm" {
   # dev environment. Without this, destroy triggers an InvalidUnregistration 409
   # when other resources in the subscription still depend on the provider.
   resource_provider_registrations = "none"
-  features {}
+  features {
+    resource_group {
+      # Allow terraform destroy to proceed even if nested resources exist
+      # (e.g. Azure-created Smart Detection action groups under App Insights)
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }

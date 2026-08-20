@@ -23,6 +23,11 @@ output "application_insights_connection_string" {
   sensitive = true
 }
 
+output "application_insights_instrumentation_key" {
+  value     = azurerm_application_insights.this.instrumentation_key
+  sensitive = true
+}
+
 output "key_vault_uri" {
   value = azurerm_key_vault.this.vault_uri
 }
